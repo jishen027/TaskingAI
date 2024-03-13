@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, Request
-from app.schemas.assistant.message import MessageGenerateRequest
-from app.schemas.base import BaseSuccessDataResponse
 from starlette.responses import StreamingResponse
-from ..utils import auth_info_required
 from typing import Dict
-from common.services.assistant.generation import NormalSession, StreamSession
-from common.services.assistant.chat import is_chat_locked, lock_chat
-from common.error import ErrorCode, raise_http_error
+
+from tkhelper.schemas.base import BaseDataResponse
+
+from app.services.assistant import get_assistant_and_chat, NormalSession, StreamSession
+from app.schemas.assistant.generate import MessageGenerateRequest
+
+from ..utils import auth_info_required
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,10 +20,10 @@ router = APIRouter()
     "/assistants/{assistant_id}/chats/{chat_id}/generate",
     summary="Generate message",
     operation_id="generate_message",
-    tags=["Assistant"],
+    tags=["Assistant - Message"],
     responses={422: {"description": "Unprocessable Entity"}},
     description="Generate a new message with the role of 'assistant'.",
-    response_model=BaseSuccessDataResponse,
+    response_model=BaseDataResponse,
 )
 async def api_chat_generate(
     request: Request,
@@ -31,29 +33,24 @@ async def api_chat_generate(
     auth_info: Dict = Depends(auth_info_required),
 ):
     system_prompt_variables = payload.system_prompt_variables
-    stream = payload.stream
 
-    if await is_chat_locked(assistant_id, chat_id):
-        raise_http_error(
-            ErrorCode.OBJECT_LOCKED, message="Chat is locked by another generation process. Please try again later."
-        )
+    assistant, chat = await get_assistant_and_chat(assistant_id, chat_id)
 
     if payload.stream or payload.debug:
         session = StreamSession(
-            assistant_id=assistant_id,
-            chat_id=chat_id,
+            assistant=assistant,
+            chat=chat,
             stream=payload.stream,
             debug=payload.debug,
         )
-        await session.prepare(stream, system_prompt_variables, retrival_log=payload.debug)
-        await lock_chat(assistant_id, chat_id)
-        return StreamingResponse(session.stream_generate(), media_type="text/event-stream")
+        return StreamingResponse(
+            session.stream_generate(system_prompt_variables),
+            media_type="text/event-stream",
+        )
 
     else:
         session = NormalSession(
-            assistant_id=assistant_id,
-            chat_id=chat_id,
+            assistant=assistant,
+            chat=chat,
         )
-        await session.prepare(stream, system_prompt_variables, retrival_log=False)
-        await lock_chat(assistant_id, chat_id)
-        return await session.generate()
+        return await session.generate(system_prompt_variables)

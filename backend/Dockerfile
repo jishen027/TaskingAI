@@ -17,7 +17,8 @@ COPY ./requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
-COPY . ./
+COPY ./app ./app
+COPY ./tkhelper ./tkhelper
 
 # Expose port 8000
 EXPOSE 8000

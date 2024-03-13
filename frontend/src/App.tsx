@@ -1,4 +1,3 @@
-// import { useState } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import './App.scss'
 import { ToastContainer } from 'react-toastify';
@@ -13,7 +12,7 @@ function App() {
         <AuthRouter>
             <GetRouters/>
         </AuthRouter>
-        <ToastContainer autoClose={2000} />
+        <ToastContainer autoClose={2000} className="custom-toast-container" />
       </BrowserRouter>
     </>
 

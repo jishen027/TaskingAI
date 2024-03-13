@@ -1,10 +1,11 @@
 from ..utils import auth_info_required
 from fastapi import APIRouter, Depends, Request
 from typing import Dict
-from common.services.auth.admin import *
 from app.schemas.auth.admin import *
-from app.schemas.base import BaseSuccessEmptyResponse, BaseSuccessDataResponse
-from common.models import Admin, SerializePurpose
+from tkhelper.schemas.base import BaseEmptyResponse, BaseDataResponse
+from app.services.auth.admin import *
+from app.models import Admin
+
 
 router = APIRouter()
 
@@ -14,7 +15,7 @@ router = APIRouter()
     tags=["Admin"],
     summary="Login Admin",
     operation_id="login_admin",
-    response_model=BaseSuccessDataResponse,
+    response_model=BaseDataResponse,
 )
 async def api_login_admin(
     request: Request,
@@ -24,8 +25,8 @@ async def api_login_admin(
         username=data.username,
         password=data.password,
     )
-    return BaseSuccessDataResponse(
-        data=admin.to_dict(purpose=SerializePurpose.RESPONSE),
+    return BaseDataResponse(
+        data=admin.to_response_dict(),
     )
 
 
@@ -34,7 +35,7 @@ async def api_login_admin(
     tags=["Admin"],
     summary="Logout Admin",
     operation_id="logout_admin",
-    response_model=BaseSuccessEmptyResponse,
+    response_model=BaseEmptyResponse,
 )
 async def api_logout_admin(
     request: Request,
@@ -43,7 +44,7 @@ async def api_logout_admin(
     await logout_admin(
         admin_id=auth_info["admin_id"],
     )
-    return BaseSuccessEmptyResponse()
+    return BaseEmptyResponse()
 
 
 @router.post(
@@ -51,13 +52,13 @@ async def api_logout_admin(
     tags=["Admin"],
     summary="Verify Admin Token",
     operation_id="verify_admin_token",
-    response_model=BaseSuccessEmptyResponse,
+    response_model=BaseEmptyResponse,
 )
 async def api_verify_admin_token(
     request: Request,
     auth_info: Dict = Depends(auth_info_required),
 ):
-    return BaseSuccessEmptyResponse()
+    return BaseEmptyResponse()
 
 
 @router.post(
@@ -65,7 +66,7 @@ async def api_verify_admin_token(
     tags=["Admin"],
     summary="Refresh Admin Token",
     operation_id="refresh_admin_token",
-    response_model=BaseSuccessDataResponse,
+    response_model=BaseDataResponse,
 )
 async def api_refresh_admin_token(
     request: Request,
@@ -74,6 +75,6 @@ async def api_refresh_admin_token(
     admin = await refresh_admin_token(
         admin_id=auth_info["admin_id"],
     )
-    return BaseSuccessDataResponse(
-        data=admin.to_dict(purpose=SerializePurpose.RESPONSE),
+    return BaseDataResponse(
+        data=admin.to_response_dict(),
     )

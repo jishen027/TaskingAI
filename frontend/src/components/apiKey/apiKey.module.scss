@@ -1,7 +1,7 @@
 .api-keys {
     height: 100%;
     padding: 0 24px;
-    background-color: white;
+    background-color: var(--color-item-background);
 
     :global {
         .ant-spin-nested-loading {
@@ -129,12 +129,25 @@
         }
     }
 }
+.api-keys  {
+    width: 100%;
+    margin:0;
+    .spinloading {
+        padding: 0;
+        height: 100% !important;
 
+        :global {
+            .ant-spin-container {
+                height: 100% !important;
+            }
+        }
+    }
+}
 .delete-apikey-modal {
     :global {
         .ant-modal-body {
             padding: 24px 24px 10px 24px;
-
+            background-color: var(--color-item-background);
         }
 
     }
@@ -155,7 +168,7 @@
     :global {
         .ant-modal-body {
             padding: 24px;
-
+            background-color: var(--color-item-background);
         }
     }
 
