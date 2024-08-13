@@ -1,6 +1,6 @@
 from typing import Optional, Any
 
-from pydantic import BaseModel, Extra, Field
+from pydantic import BaseModel, Field
 from typing import Dict
 from app.models import RecordType, TextSplitter
 
@@ -19,7 +19,23 @@ __all__ = [
 class RecordCreateRequest(BaseModel):
     type: RecordType = Field(
         "text",
-        escription="The record type. Currently only `text` is supported.",
+        description="The record type.",
+    )
+
+    file_id: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=256,
+        description="The file id. It is required when the record type is `file`.",
+        examples=["File id"],
+    )
+
+    url: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=2048,
+        description="The url is required when the record type is `web`.",
+        examples=["Url"],
     )
 
     title: str = Field(
@@ -30,8 +46,8 @@ class RecordCreateRequest(BaseModel):
         examples=["Record title"],
     )
 
-    content: str = Field(
-        ...,
+    content: Optional[str] = Field(
+        None,
         min_length=1,
         max_length=32768,
         description="The record content.",
@@ -47,16 +63,13 @@ class RecordCreateRequest(BaseModel):
 
     metadata: Dict[str, str] = Field(
         {},
-        min_length=0,
-        max_length=16,
+        min_items=0,
+        max_items=16,
         description="The record metadata. "
         "It can store up to 16 key-value pairs where each key's length is less than 64 "
         "and value's length is less than 512.",
         examples=[{}],
     )
-
-    class Config:
-        extra = Extra.forbid
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         d = super().model_dump(**kwargs)
@@ -73,7 +86,23 @@ class RecordCreateRequest(BaseModel):
 class RecordUpdateRequest(BaseModel):
     type: Optional[RecordType] = Field(
         None,
-        escription="The record type. Currently only `text` is supported.",
+        description="The record type.",
+    )
+
+    file_id: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=256,
+        description="The file id. It is required when the record type is `file`.",
+        examples=["File id"],
+    )
+
+    url: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=2048,
+        description="The url is required when the record type is `web`.",
+        examples=["Url"],
     )
 
     title: Optional[str] = Field(
@@ -101,13 +130,10 @@ class RecordUpdateRequest(BaseModel):
 
     metadata: Optional[Dict[str, str]] = Field(
         None,
-        min_length=0,
-        max_length=16,
+        min_items=0,
+        max_items=16,
         description="The record metadata. "
         "It can store up to 16 key-value pairs where each key's length is less than 64 "
         "and value's length is less than 512.",
         examples=[{}],
     )
-
-    class Config:
-        extra = Extra.forbid

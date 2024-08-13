@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field, Extra
+from pydantic import BaseModel, Field
 from app.models import Chunk
 
 __all__ = [
@@ -24,9 +24,16 @@ class ChunkQueryRequest(BaseModel):
         description="The query text. Retrieval service will find and return the most relevant chunks to this text.",
         examples=["What is machine learning?"],
     )
-
-    class Config:
-        extra = Extra.forbid
+    score_threshold: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="The minimum score threshold to return the chunks.", examples=[0.5]
+    )
+    rerank_model_id: Optional[str] = Field(
+        None,
+        min_length=8,
+        max_length=8,
+        description="The name of the model to use for reranking the retrieval results.",
+        examples=["rerank_model"],
+    )
 
 
 class ChunkQueryResponse(BaseModel):

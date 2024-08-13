@@ -78,7 +78,7 @@ async def sync_model_schema_data():
                         model_schema.type
                         for model_schema in model_schemas
                         if model_schema.provider_id == provider_data["provider_id"]
-                        and model_schema.type != ModelType.WILDCARD
+                        # and model_schema.type != ModelType.WILDCARD
                     ]
                 )
             )
@@ -161,7 +161,7 @@ async def list_model_schemas(
     filtered_schemas = [
         schema
         for schema in _model_schemas
-        if (provider_id is None or schema.provider_id == provider_id) and (type is None or schema.type == type.value)
+        if (provider_id is None or schema.provider_id == provider_id) and (type is None or schema.type == type.value or schema.type == ModelType.WILDCARD.value)
     ]
 
     # Paginate

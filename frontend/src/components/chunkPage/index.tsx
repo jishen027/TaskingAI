@@ -179,11 +179,14 @@ function ChunkPage({ collectionId }: { collectionId: string }) {
         setOpenDeleteModal(false)
     }
     const handleEdit = async (record: any) => {
+        setLoading(true)
         setDrawerTitle(`${t('projectChunkEditChunk')}`)
         setRecordId(record.chunk_id)
-        setCreateOpenModal(true)
         const res = await getRecord(collectionId, record.chunk_id)
         setContentValue(res.data.content)
+        setCreateOpenModal(true)
+        setLoading(false)
+
     }
     const handleConfirm = async () => {
         if (!contentValue) {
@@ -200,6 +203,7 @@ function ChunkPage({ collectionId }: { collectionId: string }) {
             } else {
                 const param1 = {
                     ...params,
+                    metadata: {}
                 }
                 await updateRecord(collectionId, recordId, param1)
             }
@@ -219,7 +223,7 @@ function ChunkPage({ collectionId }: { collectionId: string }) {
     }
     return (
         <Spin spinning={loading} >
-            <ModalTable ifOnlyId={true} onOpenDrawer={handleCreatePrompt} onChildEvent={handleChildEvent} updatePrevButton={updatePrevButton} dataSource={recordList} ifSelect={false} name="chunk" columns={columns} hasMore={hasMore} id="chunk_id"></ModalTable>
+            <ModalTable title='New chunk' ifOnlyId={true} onOpenDrawer={handleCreatePrompt} onChildEvent={handleChildEvent} updatePrevButton={updatePrevButton} dataSource={recordList} ifSelect={false} name="chunk" columns={columns} hasMore={hasMore} id="chunk_id"></ModalTable>
             <Modal footer={[
                 <Button key="cancel" onClick={handleCancel} className='cancel-button'>
                    {t('cancel')}

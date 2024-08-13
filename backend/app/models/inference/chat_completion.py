@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Union
 from pydantic import BaseModel, Field
 from abc import ABCMeta
 from .chat_completion_function import ChatCompletionFunctionCall
@@ -12,6 +12,7 @@ __all__ = [
     "ChatCompletionUserMessage",
     "ChatCompletionAssistantMessage",
     "ChatCompletionFunctionMessage",
+    "ChatCompletionAnyMessage",
     "ChatCompletionFinishReason",
     "ChatCompletion",
     "ChatCompletionChunk",
@@ -61,7 +62,7 @@ class ChatCompletionAssistantMessage(ChatCompletionMessage):
 
     function_calls: Optional[List[ChatCompletionFunctionCall]] = Field(
         None,
-        description="The funcion calls requested by the assistant.",
+        description="The function calls requested by the assistant.",
     )
 
 
@@ -77,6 +78,25 @@ class ChatCompletionFunctionMessage(ChatCompletionMessage):
         ...,
         description="The corresponding id of the tool requested by the assistant.",
         examples=["call_abc123"],
+    )
+
+
+ChatCompletionAnyMessage = Union[
+    ChatCompletionFunctionMessage,
+    ChatCompletionAssistantMessage,
+    ChatCompletionUserMessage,
+    ChatCompletionSystemMessage,
+]
+
+
+class ChatCompletionUsage(BaseModel):
+    input_tokens: int = Field(
+        ...,
+        description="The number of tokens in the input.",
+    )
+    output_tokens: int = Field(
+        ...,
+        description="The number of tokens in the output.",
     )
 
 
@@ -112,6 +132,11 @@ class ChatCompletion(BaseModel):
         ...,
         description="The timestamp in milliseconds when the response is created.",
         examples=[1700000000000],
+    )
+
+    usage: ChatCompletionUsage = Field(
+        ...,
+        description="The token usage of the response.",
     )
 
 

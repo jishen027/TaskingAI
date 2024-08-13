@@ -1,0 +1,26 @@
+model_schema_id: mistralai/open-mixtral-8x7b
+provider_model_id: open-mixtral-8x7b
+type: chat_completion
+name: "i18n:open_mixtral_8x7b_name"
+description: "i18n:open_mixtral_8x7b_description"
+
+properties:
+  function_call: false
+  streaming: true
+
+config_schemas:
+  - config_id: temperature
+  - config_id: top_p
+  - config_id: max_tokens
+    type: int
+    default: 32000
+    min: 1
+    max: 32000
+    step: 1
+  - config_id: response_format
+
+pricing:
+ input_token: 0.7
+ output_token: 0.7
+ unit: 1000000
+ currency: USD

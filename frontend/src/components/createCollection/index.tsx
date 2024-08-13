@@ -22,12 +22,12 @@ import { useTranslation } from "react-i18next";
 function CreateCollection(props: createCollectionType) {
     const { t } = useTranslation();
     const dispatch = useDispatch();
-
     const { modelsTableColumn } = CommonComponents();
     const { OpenDrawer, handleModalCloseOrOpen, handleFetchData } = props
     const [drawerName, setDrawerName] = useState('')
     const [descriptionText, setDescriptionText] = useState('')
     const [selectedRows, setSelectedRows] = useState<string[]>([])
+    const [selectModelName, setSelectModelName] = useState<string | undefined>(undefined)
     const [selectValue, setSelectValue] = useState(1000)
     const [modelOne, setModelOne] = useState(false);
     const [recordsSelected, setRecordsSelected] = useState<string[]>([])
@@ -66,6 +66,7 @@ function CreateCollection(props: createCollectionType) {
         setDrawerName('')
         setDescriptionText('')
         setSelectedRows([])
+        setSelectModelName(undefined)
         setSelectValue(1000)
         setRecordsSelected([])
         setDefaultSelectedRowKeys([])
@@ -75,6 +76,7 @@ function CreateCollection(props: createCollectionType) {
         setDrawerName(e.target.value)
     }
     const handleSelectModelId = () => {
+        setRecordsSelected([])
         setModalTableOpen(true)
         setUpdatePrevButton(false)
     }
@@ -92,12 +94,14 @@ function CreateCollection(props: createCollectionType) {
 
                 name: drawerName || '',
                 description: descriptionText || '',
+                metadata: {}
             }
             await createRetrieval(params)
             handleFetchData()
             setDrawerName('')
             setDescriptionText('')
             setSelectedRows([])
+            setSelectModelName(undefined)
             setSelectValue(1000)
             setRecordsSelected([])
             setDefaultSelectedRowKeys([])
@@ -121,14 +125,32 @@ function CreateCollection(props: createCollectionType) {
     const handleModalClose = () => {
         setModalTableOpen(false)
         setUpdatePrevButton(false)
+        setDefaultSelectedRowKeys([])
+        setSelectModelName(undefined)
+        setSelectedRows([])
+    }
+    const handleModalCloseConfirm = () => {
+        console.log(selectedRows)
+        if (selectedRows.length) {
+            let str = selectedRows[0];
+            let index = str.lastIndexOf('-');
+            if (index !== -1) {
+                let result = str.substring(0, index);
+                setSelectModelName(result)
+            }
+        }
+        setModalTableOpen(false)
+
     }
     const handleRecordsSelected = (value: string[], selectedRows: any[]) => {
         setRecordsSelected(value)
         const tag = selectedRows.map(item => (item.name + '-' + item.model_id))
         if (value.length === 0) {
             setSelectedRows([])
+            setSelectModelName(undefined)
         } else {
             setSelectedRows(tag)
+            // setSelectModelName(selectedRows.map(item => (item.name))[0])
         }
     }
     const handleCreateModelId = async () => {
@@ -168,9 +190,10 @@ function CreateCollection(props: createCollectionType) {
                         open={false}
                         mode="multiple"
                         className={styles['input']}
+                        style={{caretColor: 'transparent'}}
                         suffixIcon={<RightOutlined />}
                         maxTagCount={2} removeIcon={null}
-                        value={selectedRows} onClick={handleSelectModelId}
+                        value={selectModelName} onClick={handleSelectModelId}
                     >
 
                     </Select>
@@ -208,7 +231,7 @@ function CreateCollection(props: createCollectionType) {
                         <Button key="cancel" onClick={handleModalClose} className={`cancel-button ${styles.cancelButton}`}>
                             {t('cancel')}
                         </Button>
-                        <Button key="submit" onClick={handleModalClose} className='next-button'>
+                        <Button key="submit" onClick={handleModalCloseConfirm} className='next-button'>
                             {t('confirm')}
                         </Button>
                     </div>
@@ -216,7 +239,7 @@ function CreateCollection(props: createCollectionType) {
                 </div>
 
             ]} title={t('projectSelectModel')} open={modalTableOpen} width={1000} className={`modal-inner-table ${styles['retrieval-model']}`}>
-                <ModalTable name="model" onOpenDrawer={handleCreateModelId} updatePrevButton={updatePrevButton} defaultSelectedRowKeys={defaultSelectedRowKeys} handleRecordsSelected={handleRecordsSelected} ifSelect={true} columns={modelsTableColumn} hasMore={modelHasMore} id='model_id' dataSource={options} onChildEvent={handleChildModelEvent}></ModalTable>
+                <ModalTable title='New model' name="model" onOpenDrawer={handleCreateModelId} updatePrevButton={updatePrevButton} defaultSelectedRowKeys={defaultSelectedRowKeys} handleRecordsSelected={handleRecordsSelected} ifSelect={true} columns={modelsTableColumn} hasMore={modelHasMore} id='model_id' dataSource={options} onChildEvent={handleChildModelEvent}></ModalTable>
             </Modal>
             <ModelModal type='text_embedding'  getOptionsList={fetchModelsList} ref={childRef} open={modelOne} handleSetModelOne={handleModalCancel} modelType='text_embedding' handleSetModelConfirmOne={handleSetModelConfirmOne}></ModelModal>
         </>

@@ -35,13 +35,22 @@ class RetrievalConfig(BaseModel):
     max_tokens: Optional[int] = Field(
         None,
         ge=1,
-        le=8192,
         description="Specifies the maximum token number of relevant text chunks to retrieve.",
         examples=[1000],
     )
 
+    score_threshold: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Specifies the minimum score threshold for relevant text chunks to retrieve.",
+        examples=[0.5],
+    )
+
     method: RetrievalMethod = Field(
-        RetrievalMethod.MEMORY, description="The retrieval method.", examples=["function_call"]
+        ...,
+        description="The retrieval method.",
+        examples=["function_call"],
     )
 
     function_description: Optional[str] = Field(
@@ -55,6 +64,16 @@ class RetrievalConfig(BaseModel):
     )
 
 
+DEFAULT_RETRIEVAL_CONFIG = RetrievalConfig(
+    top_k=3,
+    max_tokens=None,
+    score_threshold=0.6,
+    method=RetrievalMethod.USER_MESSAGE,
+    function_description=None,
+    rerank_model_id=None,
+)
+
+
 class RetrievalResult(BaseModel):
     ref: Dict = Field(
         ...,
@@ -63,6 +82,7 @@ class RetrievalResult(BaseModel):
             {
                 "type": "collection",
                 "collection_id": "collection_1",
+                "record_id": "record_1",
                 "chunk_id": "chunk_1",
             }
         ],

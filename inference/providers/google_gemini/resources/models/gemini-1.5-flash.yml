@@ -1,0 +1,35 @@
+model_schema_id: google_gemini/gemini-1.5-flash
+provider_model_id: gemini-1.5-flash
+type: chat_completion
+name: "i18n:gemini_1_5_flash_latest_name"
+description: "i18n:gemini_1_5_flash_latest_description"
+
+properties:
+  vision: true
+  function_call: true
+  streaming: true
+  input_token_limit: 1048576
+  output_token_limit: 8192
+
+config_schemas:
+  - config_id: temperature
+    type: float
+    default: 0.7
+    min: 0.0
+    max: 2.0
+    step: 0.1
+  - config_id: top_p
+  - config_id: top_k
+  - config_id: max_tokens
+    type: int
+    default: 8192
+    min: 1
+    max: 8192
+    step: 1
+  - config_id: stop
+
+pricing:
+  input_token: 0.35
+  output_token: 0.70
+  unit: 1000000
+  currency: USD

@@ -27,8 +27,9 @@ export const router_item = [
         element: lazyLoad(lazy(() => import("@/views/projectHome/index.tsx"))),
         key: 'projectHome',
         children: [
-            { path: '', element: lazyLoad(lazy(() => import("@/components/modelsPage"))), key: 'project' },
+            { path: '', element: lazyLoad(lazy(() => import("@/components/dashboard/index"))), key: 'project' },
             { path: 'models', element: lazyLoad(lazy(() => import("@/components/modelsPage"))), key: 'models' },
+            { path: 'home', element: lazyLoad(lazy(() => import("@/components/dashboard/index"))), key: 'dashboard' },
             { path: 'playground', element: lazyLoad(lazy(() => import("@/components/playground/index.tsx"))), key: 'playground' },
             { path: 'assistants', element: lazyLoad(lazy(() => import("@/components/assistants/index.tsx"))), key: 'assistants' },
             {

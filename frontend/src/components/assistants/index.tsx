@@ -11,9 +11,12 @@ import ModalTable from '../modalTable/index'
 import tooltipTitle from '../../contents/tooltipTitle.tsx'
 import { fetchAssistantsData } from '@/Redux/actions.ts'
 import CreateCollection from '../createCollection/index.tsx';
+import { setPlaygroundSelect, setPlaygroundAssistantId, } from '@/Redux/actions/playground.ts'
 import { getActionsList, createActions } from '../../axios/actions.ts'
 import EditIcon from '../../assets/img/editIcon.svg?react'
-import DeleteIcon from '../../assets/img/deleteIcon.svg?react'
+import ViewCode from '@/commonComponent/viewCode/index.tsx'
+import MoreIcon from '@/assets/img/moreIcon.svg?react'
+import { getViewCode } from '@/axios/index'
 import JumpIcon from '../../assets/img/assistantJumpIcon.svg?react'
 import { getFirstMethodAndEndpoint } from '@/utils/util'
 import { toast } from 'react-toastify'
@@ -32,16 +35,20 @@ import { valueLimit, assistantListType, commonDataType } from '@/constant/assist
 import CommonComponents from '../../contents/index'
 import {
     Button,
-    Space, Drawer, Spin, Modal, Tooltip
+    Space, Drawer, Spin, Modal, Tooltip,Popover
 } from 'antd';
 function Assistant() {
     const dispatch = useDispatch();
     const { pluginLists } = useSelector((state: any) => state.plugin);
     const { retrievalLists } = useSelector((state: any) => state.retrieval);
-    const { users,loading } = useSelector((state: any) => state.user);
-    const { assistantTableColumn, modelsTableColumn,  } = CommonComponents();
-    const { tooltipEditTitle, tooltipDeleteTitle, tooltipPlaygroundTitle } = tooltipTitle();
+    const { users, loading } = useSelector((state: any) => state.user);
+    const { assistantTableColumn, modelsTableColumn, } = CommonComponents();
+    const { assistantPlaygroundId } = useSelector((state: any) => state.assistantId)
+    const { tooltipEditTitle, tooltipPlaygroundTitle,tooltipMoreTitle } = tooltipTitle();
     const [bundilesList, setBundlesList] = useState([])
+    const [isVisible, setIsVisible] = useState(true);
+    const [record, setRecord] = useState<any>({})
+    const [originalModelData, setOriginalModelData] = useState<any>()
     const { t } = useTranslation();
     const columns = [...assistantTableColumn]
     columns.push(
@@ -56,18 +63,18 @@ function Assistant() {
                         <Tooltip placement='bottom' title={tooltipPlaygroundTitle} color='#fff' arrow={false} overlayClassName='table-tooltip'>
                             <JumpIcon />
                         </Tooltip>
-
                     </div>
-
                     <div onClick={() => handleEdit(record)} className='table-edit-icon'>
                         <Tooltip placement='bottom' title={tooltipEditTitle} color='#fff' arrow={false} overlayClassName='table-tooltip'>
-                            <EditIcon />
+                        <EditIcon/>
                         </Tooltip>
                     </div>
-                    <div onClick={() => handleDelete(record)} className='table-edit-icon' >
-                        <Tooltip placement='bottom' title={tooltipDeleteTitle} color='#fff' arrow={false} overlayClassName='table-tooltip'>
-                            <DeleteIcon />
-                        </Tooltip>
+                    <div className='table-edit-icon' onClick={()=>setRecord(record)}>
+                    {isVisible ? <Tooltip placement='bottom' title={tooltipMoreTitle} color='#fff' arrow={false} overlayClassName='table-tooltip'>
+                        <Popover trigger="click" placement='bottom' content={content} arrow={false}>
+                            <MoreIcon  />
+                        </Popover>
+                    </Tooltip> :  <MoreIcon  />}
                     </div>
                 </Space>
             ),
@@ -78,8 +85,9 @@ function Assistant() {
     const [OpenDrawer, setOpenDrawer] = useState(false)
     const [Authentication, setAuthentication] = useState('')
     const [radioValue, setRadioValue] = useState('none')
-    const [recordsSelected, setRecordsSelected] = useState([])
-    const [selectedRows, setSelectedRows] = useState<any[]>([])
+    const [recordsSelected, setRecordsSelected] = useState<any>([])
+    const [selectedModelRows, setSelectedRows] = useState<any[]>([])
+    const [selectedActionsSelected, setSelectedActionSelected] = useState<any[]>([])
     const [selectedRetrievalRows, setSelectedRetrievalRows] = useState<any[]>([])
     const [options, setOptions] = useState([])
     const [limit, setLimit] = useState(20)
@@ -89,16 +97,17 @@ function Assistant() {
     const [selectedActionsRows, setSelectedActionsRows] = useState<any[]>([])
     const [OpenDeleteModal, setOpenDeleteModal] = useState(false)
     const [drawerTitle, setDrawerTitle] = useState('Create Assistant')
-    const [drawerName, setDrawerName] = useState('')
+    const [drawerName, setDrawerName] = useState<any>('')
     const [hasActionMore, setHasActionMore] = useState(false)
     const [tipSchema, setTipSchema] = useState(false)
     const [deleteValue, setDeleteValue] = useState('')
     const [drawerDesc, setDrawerDesc] = useState('')
     const [modalTableOpen, setModalTableOpen] = useState(false)
     const [memoryValue, setMemoryValue] = useState('zero')
-    const [retrievalConfig,setRetrievalConfig] = useState('user_message')
+    const [retrievalConfig, setRetrievalConfig] = useState('user_message')
     const [OpenActionDrawer, setOpenActionDrawer] = useState(false)
     const [actionList, setActionList] = useState([])
+    const [editLoading, setLoading] = useState(false)
     const childRef = useRef<ChildRefType | null>(null);
     const [hasModelMore, setHasModelMore] = useState(false)
     const [custom, setCustom] = useState('')
@@ -113,20 +122,33 @@ function Assistant() {
     const [openCollectionDrawer, setOpenCollectionDrawer] = useState(false)
     const [inputValueTwo, setInputValueTwo] = useState(2000)
     const [pluginModalOpen, setPluginModalOpen] = useState(false)
+    const [selectedPluginGroup, setSelectedPluginGroup] = useState<any>([])
+    const [assistantPlaygroundIdParams, setAssistantPlaygroundIdParams] = useState('')
     const navigate = useNavigate()
     const [topk, setTopk] = useState(3)
     const [maxTokens, setMaxToken] = useState(4096)
+    const [viewCodeOpen, setViewCodeOpen] = useState(false)
+    const [viewCodeData, setViewCodeData] = useState('')
+    const [modelName, setModelName] = useState<any>('')
     useEffect(() => {
         const params = {
             limit: 20,
         }
-       
 
         fetchActionsList(params)
         fetchModelsList()
-        fetchDataRetrievalData()
+        fetchDataRetrievalData(params)
+        const fetchCodeData = async () => {
+            const res = await getViewCode('assistant')
+            setViewCodeData(res.data)
+        }
+        fetchCodeData()
     }, []);
     useEffect(() => {
+        setAssistantPlaygroundIdParams(assistantPlaygroundId)
+    }, [assistantPlaygroundId])
+    useEffect(() => {
+        // setLoading(true);
         if (users.data.length > 0) {
             const data = users.data.map((item: any) => {
                 return {
@@ -140,7 +162,7 @@ function Assistant() {
             })
             setAssistantsList(data);
             setAssistantHasMore(users.has_more)
-        }else {
+        } else {
             setAssistantsList([])
         }
         const data = retrievalLists.data.map((item: any) => {
@@ -154,8 +176,17 @@ function Assistant() {
         setRetrievalList(data);
         setBundlesList(pluginLists.data)
         setHasMore(retrievalLists.has_more)
-    }, [users, retrievalLists,pluginLists]);
- 
+    }, [users, retrievalLists, pluginLists]);
+    const handleViewCode = () => {
+        setIsVisible(false)
+        setViewCodeOpen(true)
+    }
+    const content = (
+        <div style={{ cursor: 'pointer' }}>
+            <p className={styles['popover-eidt']} onClick={handleViewCode}>View code</p>
+            <p className={styles['popover-delete']} onClick={() => handleDelete(record)} >Delete</p>
+        </div>
+    );
     const fetchData = async (params: object) => {
         try {
             const res: any = await getAssistantsList(params)
@@ -176,10 +207,27 @@ function Assistant() {
             console.log(error)
         }
     };
-    const handleJump = (value) => {
+    const handleJump = (value: assistantListType) => {
+        dispatch(setPlaygroundSelect('assistant'))
+        localStorage.setItem('assistantName', value.name || 'Untitled Assistant')
         navigate(`/project/playground?assistant_id=${value.assistant_id}`)
     }
     const handleModalClose = () => {
+        setOriginalModelData((prev: any) => prev)
+        setSelectedRows(originalModelData as any)
+        setModalTableOpen(false)
+    }
+    const handleModalCloseConfirm = ()=> {
+        if(selectedModelRows) {
+            let str = selectedModelRows[0];
+            let index = str.lastIndexOf('-');
+            if (index !== -1) {
+                let result = str.substring(0, index);
+                setModelName(result)
+            }
+            setOriginalModelData(selectedModelRows)
+        } 
+      
         setModalTableOpen(false)
     }
     const handleSchemaChange = (value: string) => {
@@ -214,7 +262,7 @@ function Assistant() {
 
             await createActions(commonData);
             const params = {
-                limit:  20,
+                limit: 20,
             }
             await fetchActionsList(params, 'create');
         } catch (error) {
@@ -222,12 +270,15 @@ function Assistant() {
             const ErrorType = error as ApiErrorResponse;
             const errorMessage: string = ErrorType.response.data.error.message;
             toast.error(errorMessage)
+        } finally {
+            setOpenActionDrawer(false)
+        
         }
-        setOpenActionDrawer(false)
     }
-    const fetchDataRetrievalData = async () => {
+    const fetchDataRetrievalData = async (params:any) => {
         try {
-            dispatch(fetchRetrievalData(20) as any);
+            dispatch(fetchRetrievalData(params) as any);
+
         } catch (e) {
             console.log(e)
         }
@@ -262,14 +313,13 @@ function Assistant() {
                     created_timestamp: formatTimestamp(item.created_timestamp)
                 }
             })
-
             setActionList(data)
             setHasActionMore(res.has_more)
         } catch (error) {
             console.log(error)
         }
     }
-   
+
     const handleCreateModelId = async () => {
         await setModelOne(true)
         childRef.current?.fetchAiModelsList()
@@ -280,40 +330,69 @@ function Assistant() {
         setDrawerTitle('Create Assistant')
         setAssistantId('')
         setSystemPromptTemplate([''])
+        setSelectedPluginGroup([])
         setSelectedRetrievalRows([''])
         setSelectedActionsRows([{ type: 'plugin', value: '' }])
+        setSelectedActionSelected([])
         setDrawerName('')
         setSelectedRows([])
+        setModelName(undefined)
         setMemoryValue('zero')
         setDrawerDesc('')
+        setRecordsSelected([])
         setOpenDrawer(true)
+        setIsVisible(false)
     }
     const handleEdit = (val: assistantListType) => {
+        console.log(val)
+        setModelName(val.model_name)
         setDrawerTitle(`${t('projectEditAssistant')}`)
-        const tag = val.retrievals.map(item => item.id)
+        const tag = val.retrievals.map(item => {
+            return {
+                collection_id: item.id,
+                name: item.name || 'Untitled Collection'
+            }
+        })
         setSelectedRetrievalRows(tag)
-        setSelectedActionsRows(val.tools.map(item => {return {type: item.type, value: item.id}}))
+        setSelectedActionSelected(val.tools.filter(item=>item.type === 'action').map(item=>{
+            return {
+                action_id: item.id,
+                name: item.name
+            }
+        }))
+        setSelectedPluginGroup(val.tools?.filter(item => item.type === 'plugin').map(item => item.id?.split('/')[1]));
+        setSelectedActionsRows(val.tools.map(item => { return { type: item.type, value: item.id,name: item.name } }))
         setDrawerName(val.name)
         setDrawerDesc(val.description)
+        setRetrievalConfig(val.retrieval_configs.method || 'user_message')
+        setTopk(val.retrieval_configs.top_k || 3)
+        setMaxToken(val.retrieval_configs.max_tokens || 4096)
         setInputValueOne(val.max_messages)
         setInputValueTwo(val.max_tokens)
         setMemoryValue(val.memory)
+        setRecordsSelected([val.model_id])
+
         setAssistantId(val.assistant_id)
         setSystemPromptTemplate(val.system_prompt_template)
         setSelectedRows([val.model_id])
+        setOriginalModelData([val.model_id])
         setOpenDrawer(true)
+        setIsVisible(false)
     }
 
     const handleDelete = (val: assistantListType) => {
         setOpenDeleteModal(true)
+        setIsVisible(false)
+
         setDeleteValue(val.name)
         setAssistantId(val.assistant_id)
     }
     const onDeleteCancel = () => {
+        setIsVisible(true)
         setOpenDeleteModal(false)
     }
-    const handleRetrievalConfigChange1 = (value:string)=> {
-         setRetrievalConfig(value)
+    const handleRetrievalConfigChange1 = (value: string) => {
+        setRetrievalConfig(value)
     }
     const onDeleteConfirm = async () => {
         const params = {
@@ -322,15 +401,22 @@ function Assistant() {
         setUpdatePrevButton(true)
 
         try {
+            if (assistantId === assistantPlaygroundIdParams) {
+                await dispatch(setPlaygroundAssistantId(''))
+            }
             await deleteAssistant(assistantId)
+            dispatch(fetchAssistantsData() as any)
             await fetchData(params)
             setOpenDeleteModal(false)
 
         } catch (error) {
             console.log(error)
-            const errotType = error as ApiErrorResponse
-            const errorMessage: string = errotType.response.data.error.message;
+            const errorType = error as ApiErrorResponse
+            const errorMessage: string = errorType.response.data.error.message;
             toast.error(errorMessage)
+        } finally {
+            setIsVisible(true)
+        
         }
     }
     const handleMemoryChange1 = (value: string) => {
@@ -343,18 +429,18 @@ function Assistant() {
             }
         }).filter((item: any) => item.id)
         const inputPluginValues = (drawerAssistantRef.current?.getActionSelectedList() || []).map((item: any) => ({ type: item.type, id: item.value })).filter((item: any) => item.id)
-       
+
         let systemTemplate: string[] = [];
         if (systemPromptTemplate.length === 1 && systemPromptTemplate[0] === '') {
             systemTemplate = []
         } else {
             systemTemplate = systemPromptTemplate
         }
-        if (selectedRows.length === 0) {
+        if (originalModelData.length === 0) {
             return toast.error(`${t('projectModelRequired')}`)
         }
         const params = {
-            model_id: selectedRows[0].slice(-8),
+            model_id: originalModelData[0].slice(-8),
             name: drawerName || '',
             description: drawerDesc || '',
             system_prompt_template: systemTemplate,
@@ -368,7 +454,7 @@ function Assistant() {
             retrieval_configs: {
                 top_k: Number(topk) || undefined,
                 method: retrievalConfig,
-                max_count: Number(maxTokens) || undefined
+                max_tokens: Number(maxTokens) || undefined
             }
         }
         let count = 0
@@ -380,10 +466,11 @@ function Assistant() {
         if (count > 16384) {
             return toast.error(`${t('projectAssistantSystemPromptRequired')}`)
         }
-        if (selectedRows[0].slice(-8).length !== 8) {
+        if (originalModelData[0].slice(-8).length !== 8) {
             return toast.error(`${t('projectAssistantModelIDRequired')}`)
         }
         try {
+            setLoading(true)
             if (assistantId) {
                 await updateAssistant(assistantId, params)
                 setOpenDrawer(false)
@@ -402,6 +489,9 @@ function Assistant() {
             const apiError = error as ApiErrorResponse;
             const errorMessage: string = apiError.response.data.error.message;
             toast.error(errorMessage)
+        } finally {
+            setLoading(false)
+            setIsVisible(true)
         }
 
     }
@@ -430,7 +520,9 @@ function Assistant() {
     }
     const handleCancel = () => {
         setOpenDrawer(false)
+        setIsVisible(true)
     }
+
 
     const handleChildEvent = async (value: valueLimit) => {
         setLimit(value.limit)
@@ -461,7 +553,6 @@ function Assistant() {
         setModalTableOpen(value)
     }
 
-
     const handleChildModelEvent = async (value: valueLimit) => {
         setModelLimit(value.limit)
         setUpdateModelPrevButton(false)
@@ -481,7 +572,7 @@ function Assistant() {
     const handleDescriptionChange = (value: string) => {
         setDrawerDesc(value)
     }
-    
+
     const onRadioChange = (value: string) => {
         setRadioValue(value)
     }
@@ -494,11 +585,10 @@ function Assistant() {
         setSelectedRows(tag)
     }
 
-   
     const handleCustom = (value: string) => {
         setCustom(value)
     }
-  
+
     const onhandleTipError = (value: boolean) => {
         setTipSchema(value)
     }
@@ -520,11 +610,15 @@ function Assistant() {
     const handleNewBundle = () => {
         setPluginModalOpen(true)
     }
+    const handleCloseViewCode = () => {
+        setIsVisible(true)
+        setViewCodeOpen(false)
+   }
     return (
         <div className={styles["assistants"]}>
 
             <Spin spinning={loading} wrapperClassName={styles.spinloading}>
-                <ModalTable loading={loading} updatePrevButton={updatePrevButton} hasMore={assistantHasMore} id="assistant_id" ifSelect={false} columns={columns} name="assistant" dataSource={assistantsList} onChildEvent={handleChildEvent} onOpenDrawer={handleCreatePrompt} />
+                <ModalTable title='New assistant' loading={loading} updatePrevButton={updatePrevButton} hasMore={assistantHasMore} id="assistant_id" ifSelect={false} columns={columns} name="assistant" dataSource={assistantsList} onChildEvent={handleChildEvent} onOpenDrawer={handleCreatePrompt} />
             </Spin>
             <Drawer
                 className={styles['drawer-assistants']}
@@ -534,14 +628,14 @@ function Assistant() {
                     <Button key="cancel" onClick={handleCancel} className='cancel-button'>
                         {t('cancel')}
                     </Button>,
-                    <Button key="submit" onClick={handleRequest} className={`next-button ${styles['button']}`}>
+                    <Button key="submit" loading={editLoading} onClick={handleRequest} className={`next-button ${styles['button']}`}>
                         {t('confirm')}
                     </Button>
                 ]}>
-                <DrawerAssistant handleNewBundle={handleNewBundle} retrievalConfig={retrievalConfig} topk={topk} maxTokens={maxTokens} handleMaxToken={handleMaxToken} handleToks={handleToks} bundilesList={bundilesList} handleNewActionModal={handleNewActionModal} handleNewCollection={handleNewCollection}  selectedCollectionList={selectedRetrievalRows} actionHasMore={hasActionMore} actionList={actionList} collectionHasMore={hasMore} ref={drawerAssistantRef} 
-                 handleRetrievalConfigChange1={handleRetrievalConfigChange1}  retrievalList={retrievalList} selectedActionsRows={selectedActionsRows} inputValue1={inputValueOne} inputValue2={inputValueTwo} handleMemoryChange1={handleMemoryChange1} memoryValue={memoryValue} handleAddPromptInput={handleAddPrompt}  drawerName={drawerName} systemPromptTemplate={systemPromptTemplate} handleDeletePromptInput={handleDeletePromptInput} handleInputPromptChange={handleInputPromptChange} handleInputValueOne={handleInputValueOne} handleInputValueTwo={handleInputValueTwo} selectedRows={selectedRows} handleSelectModelId={handleSelectModelId} handleChangeName={handleChangeName} drawerDesc={drawerDesc} handleDescriptionChange={handleDescriptionChange}  ></DrawerAssistant>
+                <DrawerAssistant modelName={modelName} drawerTitle={drawerTitle} openDrawer={OpenDrawer} selectedActionsSelected={selectedActionsSelected} selectedPluginGroup={selectedPluginGroup} handleNewBundle={handleNewBundle} retrievalConfig={retrievalConfig} topk={topk} maxTokens={maxTokens} handleMaxToken={handleMaxToken} handleToks={handleToks} bundilesList={bundilesList} handleNewActionModal={handleNewActionModal} handleNewCollection={handleNewCollection} selectedCollectionList={selectedRetrievalRows} actionHasMore={hasActionMore} actionList={actionList} collectionHasMore={hasMore} ref={drawerAssistantRef}
+                    handleRetrievalConfigChange1={handleRetrievalConfigChange1} retrievalList={retrievalList} selectedActionsRows={selectedActionsRows} inputValue1={inputValueOne} inputValue2={inputValueTwo} handleMemoryChange1={handleMemoryChange1} memoryValue={memoryValue} handleAddPromptInput={handleAddPrompt} drawerName={drawerName} systemPromptTemplate={systemPromptTemplate} handleDeletePromptInput={handleDeletePromptInput} handleInputPromptChange={handleInputPromptChange} handleInputValueOne={handleInputValueOne} handleInputValueTwo={handleInputValueTwo} selectedRows={originalModelData} handleSelectModelId={handleSelectModelId} handleChangeName={handleChangeName} drawerDesc={drawerDesc} handleDescriptionChange={handleDescriptionChange}  ></DrawerAssistant>
             </Drawer>
-            
+
             <ModelModal type='chat_completion' ref={childRef} open={modelOne} handleSetModelConfirmOne={handleSetModelConfirmOne} handleSetModelOne={handleModalCancel} getOptionsList={fetchModelsList} modelType='chat_completion'></ModelModal>
             <Modal closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} centered onCancel={handleModalClose} footer={[
                 <div className='footer-group' key='footer1'>
@@ -555,23 +649,21 @@ function Assistant() {
                         <Button key="cancel" onClick={handleModalClose} className={`cancel-button ${styles.cancelButton}`}>
                             {t('cancel')}
                         </Button>
-                        <Button key="submit" onClick={handleModalClose} className='next-button'>
+                        <Button key="submit" onClick={handleModalCloseConfirm} className='next-button'>
                             {t('confirm')}
                         </Button>
                     </div>
-
                 </div>
-
             ]} title={t('projectSelectModel')} open={modalTableOpen} width={1000} className={`modal-inner-table ${styles['retrieval-model']}`}>
-                <ModalTable onOpenDrawer={handleCreateModelId} name="model" updatePrevButton={updateModelPrevButton} defaultSelectedRowKeys={selectedRows} handleRecordsSelected={handleRecordsSelected} ifSelect={true} columns={modelsTableColumn} hasMore={hasModelMore} id='model_id' dataSource={options} onChildEvent={handleChildModelEvent}></ModalTable>
+                <ModalTable title='New model' onOpenDrawer={handleCreateModelId} name="model" updatePrevButton={updateModelPrevButton} defaultSelectedRowKeys={selectedModelRows} handleRecordsSelected={handleRecordsSelected} ifSelect={true} columns={modelsTableColumn} hasMore={hasModelMore} id='model_id' dataSource={options} onChildEvent={handleChildModelEvent}></ModalTable>
             </Modal>
-
-            <CreatePlugin bundilesList={bundilesList} handleConfirmRequest={handleConfirmRequest} open={pluginModalOpen} handleCloseModal={handleClosePluginModal}></CreatePlugin>
+            <ViewCode open={viewCodeOpen} data={viewCodeData} handleClose={handleCloseViewCode}/>
+            <CreatePlugin handleConfirmRequest={handleConfirmRequest} open={pluginModalOpen} handleCloseModal={handleClosePluginModal}></CreatePlugin>
             <DeleteModal open={OpenDeleteModal} describe={`${t('deleteItem')} ${deleteValue || 'Untitled Assistant'}? This action cannot be undone and all integrations associated with the assistant will be affected.`} title='Delete Assistant' projectName={deleteValue || 'Untitled Assistant'} onDeleteCancel={onDeleteCancel} onDeleteConfirm={onDeleteConfirm} />
             <Drawer zIndex={10001} className={styles['drawer-action']} closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} onClose={handleActionCancel} title='Bulk Create Action' placement="right" open={OpenActionDrawer} size='large' footer={<ModalFooterEnd handleOk={() => handleActionRequest()} onCancel={handleActionCancel} />}>
                 <ActionDrawer showTipError={tipSchema} onhandleTipError={onhandleTipError} schema={schema} onSchemaChange={handleSchemaChange} onRadioChange={onRadioChange} onChangeCustom={handleCustom} onChangeAuthentication={hangleChangeAuthorization} radioValue={radioValue} custom={custom} Authentication={Authentication} />
             </Drawer>
-            <CreateCollection handleFetchData={() => fetchDataRetrievalData()} handleModalCloseOrOpen={() => setOpenCollectionDrawer(false)} OpenDrawer={openCollectionDrawer}></CreateCollection>
+            <CreateCollection handleFetchData={() => fetchDataRetrievalData({limit: 20})} handleModalCloseOrOpen={() => setOpenCollectionDrawer(false)} OpenDrawer={openCollectionDrawer}></CreateCollection>
         </div>)
 }
 export default Assistant

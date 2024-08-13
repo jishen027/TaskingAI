@@ -1,8 +1,17 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
+from pydantic import BaseModel
 from tkhelper.models import ModelEntity
 from tkhelper.utils import generate_random_id, load_json_attr
 
-__all__ = ["Model"]
+__all__ = ["Model", "ModelFallback", "ModelFallbackConfig"]
+
+
+class ModelFallback(BaseModel):
+    model_id: str
+
+
+class ModelFallbackConfig(BaseModel):
+    model_list: List[ModelFallback]
 
 
 class Model(ModelEntity):
@@ -15,10 +24,12 @@ class Model(ModelEntity):
     name: str
     type: str
     properties: Dict
+    configs: Dict
     encrypted_credentials: Dict
     display_credentials: Dict
     updated_timestamp: int
     created_timestamp: int
+    fallbacks: Optional[ModelFallbackConfig]
 
     def model_schema(self):
         from app.services.model import get_model_schema
@@ -36,6 +47,12 @@ class Model(ModelEntity):
     def is_text_embedding(self):
         return self.type == "text_embedding"
 
+    def is_rerank(self):
+        return self.type == "rerank"
+
+    def is_custom_host(self):
+        return self.provider_id == "custom_host"
+
     def allow_function_call(self):
         return self.type == "chat_completion" and self.properties.get("function_call", False)
 
@@ -52,6 +69,8 @@ class Model(ModelEntity):
         if model_schema:
             model_schema_properties = model_schema.properties or {}
         properties = model_schema_properties or load_json_attr(row, "properties", {})
+        fallbacks_dict = load_json_attr(row, "fallbacks", {}) or {"model_list": []}
+        fallbacks = ModelFallbackConfig(**fallbacks_dict)
 
         return cls(
             model_id=row["model_id"],
@@ -61,6 +80,8 @@ class Model(ModelEntity):
             name=row["name"],
             type=row["type"],
             properties=properties,
+            fallbacks=fallbacks,
+            configs=load_json_attr(row, "configs", {}),
             encrypted_credentials=load_json_attr(row, "encrypted_credentials", {}),
             display_credentials=load_json_attr(row, "display_credentials", {}),
             updated_timestamp=row["updated_timestamp"],
@@ -78,6 +99,8 @@ class Model(ModelEntity):
             "name": self.name,
             "type": self.type,
             "properties": model_schema.properties or self.properties,
+            "fallbacks": self.fallbacks.model_dump() if self.fallbacks else None,
+            "configs": self.configs,
             "display_credentials": self.display_credentials,
             "updated_timestamp": self.updated_timestamp,
             "created_timestamp": self.created_timestamp,
@@ -129,7 +152,7 @@ class Model(ModelEntity):
 
     @staticmethod
     def update_fields() -> List[str]:
-        return ["openapi_schema", "authentication"]
+        raise NotImplementedError
 
     @staticmethod
     def fields_exclude_in_response():

@@ -1,0 +1,26 @@
+model_schema_id: mistralai/open-mistral-7b
+provider_model_id: open-mistral-7b
+type: chat_completion
+name: "i18n:open_mistral_7b_name"
+description: "i18n:open_mistral_7b_description"
+
+properties:
+  function_call: false
+  streaming: true
+
+config_schemas:
+  - config_id: temperature
+  - config_id: top_p
+  - config_id: max_tokens
+    type: int
+    default: 32000
+    min: 1
+    max: 32000
+    step: 1
+  - config_id: response_format
+
+pricing:
+ input_token: 0.25
+ output_token: 0.25
+ unit: 1000000
+ currency: USD

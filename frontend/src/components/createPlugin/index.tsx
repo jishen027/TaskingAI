@@ -1,5 +1,5 @@
 import { Modal, Button, Spin, Form, Input } from 'antd';
-import { useState, useEffect } from 'react';
+import { useState, useEffect,useImperativeHandle, forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import styles from './createPlugin.module.scss';
@@ -11,7 +11,8 @@ import ToolsNew from '../../assets/img/tools.svg?react'
 import ApiErrorResponse from '@/constant/index'
 import { toast } from 'react-toastify';
 
-function CreatePlugin(props: any) {
+const CreatePlugin = forwardRef((props:any, ref) => {
+
     const { t } = useTranslation();
     const { open, handleCloseModal, handleConfirmRequest } = props
     const [openCreateModal2, setOpenCreateModal2] = useState(false);
@@ -20,7 +21,7 @@ function CreatePlugin(props: any) {
     const [form] = Form.useForm();
     const [bundleId, setBundleId] = useState('')
     const [bundilesList, setBundlesList] = useState([])
-
+    const [nextLoading1, setNextLoading1] = useState(false)
     const [pluginName, setPluginName] = useState('')
     const [credentialsSchema, setCredentialsSchema] = useState({})
     const [pluginInfoLoading, setPluginInfoLoading] = useState(false)
@@ -28,11 +29,11 @@ function CreatePlugin(props: any) {
     const [pluginListData, setPluginListData] = useState([])
     const [pluginId, setPluginId] = useState('')
     const [pluginDesc, setPluginDesc] = useState('')
+    const [description,setDescription] = useState('')
     const [inputSchema, setInputSchema] = useState({})
     const [cachedImages, setCachedImages] = useState({});
 
     useEffect(() => {
-
         const params1 = {
             limit: 100,
             offset: 0,
@@ -40,11 +41,16 @@ function CreatePlugin(props: any) {
         }
         getBundleList(params1)
     }, [])
+    useImperativeHandle(ref, () => ({
+        getBundleList: getBundleList
+    }));
     const getBundleList = async (params: object) => {
         const res: any = await bundleList(params)
         const selectedItem: any = res.data.find((item: any) => item.registered === false) || []
         setBundleId(selectedItem.bundle_id)
         setBundleName(selectedItem.name)
+        setDescription(selectedItem.description)
+
         setBundlesList(res.data)
         const imagesData: any = {};
         res.data.forEach((image: any) => {
@@ -73,8 +79,37 @@ function CreatePlugin(props: any) {
         setInputSchema(arr)
     }
 
-    const handleNext1 = () => {
-        setOpenCreateModal3(true)
+    const handleNext1 = async () => {
+        if (JSON.stringify(credentialsSchema) === '{}') {
+            const params = {
+                name: bundleName,
+                bundle_id: bundleId,
+            }
+            try {
+                setNextLoading1(true)
+                await createPlugin(params)
+                const params1 = {
+                    limit: 100,
+                    offset: 0,
+                    lang: 'en'
+                }
+                await getBundleList(params1)
+                handleConfirmRequest()
+                handleCloseModal()
+                setOpenCreateModal3(false)
+                setOpenCreateModal2(false)
+                toast.success('Creation successful!')
+            } catch (e) {
+                const apiError = e as ApiErrorResponse;
+                const errorMessage: string = apiError.response.data.error.message;
+                toast.error(errorMessage)
+            } finally {
+                setNextLoading1(false)
+            }
+        } else {
+            form.resetFields()
+            setOpenCreateModal3(true)
+        }
     }
     const handleCancel1 = () => {
         setOpenCreateModal2(false)
@@ -99,6 +134,12 @@ function CreatePlugin(props: any) {
                 }
                 setConfirmLoading(true)
                 await createPlugin(params)
+                const params1 = {
+                    limit: 100,
+                    offset: 0,
+                    lang: 'en'
+                }
+                await getBundleList(params1)
                 handleConfirmRequest()
                 setOpenCreateModal3(false)
                 setOpenCreateModal2(false)
@@ -129,11 +170,11 @@ function CreatePlugin(props: any) {
         })
         setInputSchema(arr)
     }
-    const handleClickBundle = async (bundleId: string, bundelName: string, item: any) => {
+    const handleClickBundle = async (bundleId: string, bundleName: string, item: any) => {
         setBundleId(bundleId)
         setPluginInfoLoading(true)
-        setBundleName(bundelName)
-
+        setBundleName(bundleName)
+        setDescription(item.description)
         setPluginListData(item.plugins)
         setPluginId(item.plugins[0].plugin_id)
         setCredentialsSchema(item.credentials_schema)
@@ -154,7 +195,7 @@ function CreatePlugin(props: any) {
                     <Button icon={<LeftOutlined />} key="cancel" onClick={handleCancel1} className='cancel-button'>
                         {t('back')}
                     </Button>
-                    <Button key="submit" onClick={handleNext1} className='next-button' style={{ marginLeft: '10px' }}>
+                    <Button key="submit" onClick={handleNext1} loading={nextLoading1} className='next-button' style={{ marginLeft: '10px' }}>
                         {t('confirm')}
                     </Button>
                 </> : <><Button key="cancel" onClick={handleCancel} className='cancel-button'>
@@ -165,7 +206,7 @@ function CreatePlugin(props: any) {
                         <RightOutlined />
                     </Button></>}
             </>
-        ]} zIndex={10002} width={1280} onCancel={handleCancel} centered closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} title={openCreateModal2 ? t('projectBundleSelection') : t('projectPluginCreate')} open={open} className={styles.drawerCreate}>
+        ]} zIndex={10002} width={1280} onCancel={handleCancel} centered closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} title={openCreateModal2 ? t('projectPluginCreate') : t('projectBundleSelection')} open={open} className={styles.drawerCreate}>
             {openCreateModal2 ? <div className={styles.componentsData}>
                 <div className={styles.inputWithLabelParent}>
                     <div className={styles.inputWithLabel}>
@@ -206,36 +247,39 @@ function CreatePlugin(props: any) {
                 </div></div> : <div className={styles.modalContent}>
                 <div className={styles.left}>
                     <div className={styles.selectBundleDesc}>{t('projectBundleDesc')}</div>
-                    <div className={styles.content}>
-                        {bundilesList.map((item: any, index: number) => (
-                            <div key={index} className={`${styles.frameParent} ${item.bundle_id === bundleId && styles.activeframeParent} ${item.registered && styles.registeredItem}`} onClick={item.registered ? undefined : () => { handleClickBundle(item.bundle_id, item.name, item) }}>
-                                <div className={styles.logoParent}>
-                                    <img src={(cachedImages as any)[item.bundle_id]} alt="" className={styles.img} />
-                                    <div className={styles.frameWrapper}>
+                    <div className={styles['content-modal']}>
+                        <div className={styles.content}>
+                            {bundilesList.map((item: any, index: number) => (
+                                <div key={index} className={`${styles.frameParent} ${item.bundle_id === bundleId && styles.activeframeParent} ${item.registered && styles.registeredItem}`} onClick={item.registered ? undefined : () => { handleClickBundle(item.bundle_id, item.name, item) }}>
+                                    <div className={styles.logoParent}>
+                                        <img src={(cachedImages as any)[item.bundle_id]} alt="" className={styles.img} />
                                         <div className={styles.frameWrapper}>
-                                            <div className={styles.frameDiv}>
-                                                <div className={styles.frameChild} />
+                                            <div className={styles.frameWrapper}>
+                                                <div className={styles.frameDiv}>
+                                                    <div className={styles.frameChild} />
+                                                </div>
                                             </div>
                                         </div>
+                                        {item.registered ? <div className={styles.registered}>Registered</div> : <RightArrow />}
                                     </div>
-                                    {item.registered ? <div className={styles.registered}>Registered</div> : <RightArrow />}
-                                </div>
-                                <div className={styles.googleWebSearch}>{item.name}</div>
-                                <div className={styles.label}>{item.description}</div>
+                                    <div className={styles.googleWebSearch}>{item.name}</div>
+                                    <div className={styles.label}>{item.description}</div>
 
-                                <div className={styles.frameGroup}>
-                                    <div className={styles.functionaliconsParent}>
-                                        <ToolsNew />
-                                        <div className={styles.webSearch}>{item.num_plugins} {item.num_plugins > 1 ? t('projectToolsTitle') : 'Tool'}</div>
-                                    </div>
-                                    <div className={styles.taskingaiWrapper}>
-                                        <div className={styles.taskingai}>{item.developer}</div>
+                                    <div className={styles.frameGroup}>
+                                        <div className={styles.functionaliconsParent}>
+                                            <ToolsNew />
+                                            <div className={styles.webSearch}>{item.num_plugins} {item.num_plugins > 1 ? t('projectToolsTitle') : 'Tool'}</div>
+                                        </div>
+                                        <div className={styles.taskingaiWrapper}>
+                                            <div className={styles.taskingai}>{item.developer}</div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
 
+                        </div>
                     </div>
+
                 </div>
                 <Spin spinning={pluginInfoLoading}>
                     <div className={styles.popupbodynormal}>
@@ -243,16 +287,23 @@ function CreatePlugin(props: any) {
                             <img loading="lazy" src={(cachedImages as any)[bundleId]} alt="" style={{ width: '36px', height: '36px' }} />
                             <div className={styles.googleWebSearch1}>{bundleName}</div>
                         </div>
-                        {
-                            pluginListData.map((item: any, index) => (
-                                <div className={styles.pluginContent} key={index}>
-                                    <div className={styles.pluginTitle}>{item.name}</div>
-                                    <div className={styles.pluginDesc}>
-                                        {item.description}
+                        <div className={styles['description-bundle']}>
+                            <div className={styles['desc-title']}>Description</div>
+                            <div className={styles['description-detail']}>{description}</div>
+                        </div>
+                        <div className={styles['description-bundle']}>
+                            <div className={styles['desc-title']}>Plugins</div>
+                            {
+                                pluginListData.map((item: any, index) => (
+                                    <div className={styles.pluginContent} key={index}>
+                                        <div className={styles.pluginTitle}>{item.name}</div>
+                                        <div className={styles.pluginDesc}>
+                                            {item.description}
+                                        </div>
                                     </div>
-                                </div>
-                            ))
-                        }
+                                ))
+                            }
+                        </div>
                     </div>
                 </Spin>
             </div>}
@@ -275,7 +326,7 @@ function CreatePlugin(props: any) {
                 </div>
                 <div className={styles['credentials']}>{t('projectModelCredentials')}</div>
                 <div className={styles['label-desc']} style={{ marginBottom: '24px' }}>
-                    All plugin credentials are encrypted at rest with AES-256 and in transit with TLS 1.2. Refer to <a className='href' href='https://docs.tasking.ai/docs/guide/tool/plugin/create-bundles-and-plugins' target='_blank' rel='noopener noreferrer'>documentation</a> for more information.
+                    All plugin credentials are encrypted at rest with AES-256 and in transit with TLS 1.2.
                 </div>
 
                 <Form
@@ -306,5 +357,5 @@ function CreatePlugin(props: any) {
             </div>
         </Modal>
     </>;
-}
+})
 export default CreatePlugin;

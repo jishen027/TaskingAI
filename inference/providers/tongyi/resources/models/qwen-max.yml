@@ -1,0 +1,41 @@
+model_schema_id: tongyi/qwen-max
+provider_model_id: qwen-max
+type: chat_completion
+name: "i18n:qwen_max_name"
+description: "i18n:qwen_max_description"
+default_endpoint_url: https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation
+
+properties:
+  function_call: true
+  streaming: true
+  input_token_limit: 6000
+
+config_schemas:
+  - config_id: seed
+  - config_id: temperature
+    type: float
+    default: 0.7
+    min: 0.0
+    max: 2.0
+    step: 0.01
+  - config_id: top_p
+  - config_id: max_tokens
+    type: int
+    default: 2000
+    min: 1
+    max: 2000
+    step: 1
+  - config_id: stop
+  - config_id: top_k
+  - config_id: presence_penalty
+    type: float
+    default: 0.0
+    min: -2.0
+    max: 2.0
+    step: 0.01
+
+pricing:
+  input_token: 0.04
+  output_token: 0.12
+  unit: 1000
+  currency: CNY

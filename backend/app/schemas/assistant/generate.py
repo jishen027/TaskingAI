@@ -1,5 +1,5 @@
 from typing import Dict
-from pydantic import BaseModel, Field, Extra
+from pydantic import BaseModel, Field
 from app.models import Message
 
 __all__ = [
@@ -21,7 +21,7 @@ class MessageGenerateRequest(BaseModel):
         min_length=0,
         max_length=16,
         description="The variables that fit the system prompt template.",
-        examples=[{"langauge": "English"}],
+        examples=[{"language": "English"}],
     )
     stream: bool = Field(
         False,
@@ -33,9 +33,6 @@ class MessageGenerateRequest(BaseModel):
         description="Whether to include the debug information in the response. When this option is turned on, the response data will be returned in SSE format.",
         examples=[False],
     )
-
-    class Config:
-        extra = Extra.forbid
 
 
 class MessageGenerateResponse(BaseModel):

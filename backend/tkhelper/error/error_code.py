@@ -36,6 +36,8 @@ class ErrorCode(str, Enum):
     OBJECT_LOCKED = "OBJECT_LOCKED"
     INVALID_REQUEST = "INVALID_REQUEST"
     GENERATION_ERROR = "GENERATION_ERROR"
+    PROVIDER_ERROR = "PROVIDER_ERROR"
+    CREDENTIALS_VALIDATION_ERROR = "CREDENTIALS_VALIDATION_ERROR"
 
 
 error_messages = {
@@ -46,7 +48,7 @@ error_messages = {
     ErrorCode.APIKEY_VALIDATION_FAILED: {"status_code": 401, "message": "Apikey validation failed."},
     ErrorCode.TOKEN_VALIDATION_FAILED: {"status_code": 401, "message": "Token validation failed."},
     ErrorCode.OBJECT_NOT_FOUND: {"status_code": 404, "message": "Object does not exist."},
-    ErrorCode.REQUEST_VALIDATION_ERROR: {"status_code": 400, "message": "Request validation error."},
+    ErrorCode.REQUEST_VALIDATION_ERROR: {"status_code": 422, "message": "Request validation error."},
     ErrorCode.DATA_MODEL_VALIDATION_ERROR: {"status_code": 400, "message": "Data model validation error."},
     ErrorCode.RESOURCE_LIMIT_REACHED: {
         "status_code": 429,
@@ -57,6 +59,8 @@ error_messages = {
     ErrorCode.OBJECT_LOCKED: {"status_code": 423, "message": "Object locked."},
     ErrorCode.INVALID_REQUEST: {"status_code": 400, "message": "Invalid request."},
     ErrorCode.GENERATION_ERROR: {"status_code": 500, "message": "Generation error occurred."},
+    ErrorCode.PROVIDER_ERROR: {"status_code": 400, "message": "External provider error."},
+    ErrorCode.CREDENTIALS_VALIDATION_ERROR: {"status_code": 401, "message": "Credentials validation error."},
 }
 
 assert len(error_messages) == len(ErrorCode)

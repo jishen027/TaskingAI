@@ -1,10 +1,11 @@
-name: Build and Test
+name: Backend - Build and Test
 
 on:
-  pull_request:
+  pull_request_target:
     branches: ["master"]
     paths:
       - "backend/**"
+      - ".github/workflows/test-backend.yml"
       - "!**.md"
 
 env:
@@ -21,9 +22,19 @@ jobs:
     environment: test
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          repository: ${{ github.repository }}
 
+      - name: Checkout forked repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          path: fork
+          
       - name: Set short SHA
         run: echo "IMAGE_TAG=$(echo ${{ github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
 
@@ -49,8 +60,12 @@ jobs:
           token: ${{ secrets.TASKINGAI_TEST_GH_PAT }}
 
       - name: Install Dependencies
-        working-directory: backend
+        working-directory: fork/backend
         run: pip install -r requirements.txt
+
+      - name: Install Test Dependencies
+        working-directory: fork/backend
+        run: pip install -r test_requirements.txt
 
       - name: Create Docker network
         run: docker network create taskingai-network
@@ -69,19 +84,36 @@ jobs:
           --name cache redis:7-alpine
 
       - name: Run Docker image - Inference
-        run: docker run --network taskingai-network -d --rm -e MODE=PROD --name inference taskingai/taskingai-inference:v0.2.0
+        run: docker run --network taskingai-network -d --rm -e MODE=TEST --name inference taskingai/taskingai-inference:v0.2.14
 
       - name: Run Docker image - Plugin
-        run: docker run --network taskingai-network -d --rm -e MODE=PROD --name plugin taskingai/taskingai-plugin:v0.2.0
+        env:
+          TEST_S3_SECRET_R2: ${{ secrets.TEST_S3_SECRET_R2 }}
+        run: |
+          echo "$TEST_S3_SECRET_R2" > 1.env
+          docker run --network taskingai-network -d --rm \
+          --env-file 1.env \
+          -e MODE=TEST \
+          -e PATH_TO_VOLUME="./test"  \
+          -e OBJECT_STORAGE_TYPE="s3" \
+          -e PROJECT_ID="taskingai"  \
+          --name plugin \
+          taskingai/taskingai-plugin:v0.2.10
+
+      - name: Download nltk data
+        working-directory: fork/backend
+        run: |
+          mkdir nltk_data
+          python -m nltk.downloader -d nltk_data punkt
 
       - name: Build Docker image
-        working-directory: backend
+        working-directory: fork/backend
         run: |
           docker build -t taskingai/taskingai-server:$IMAGE_TAG .
           echo "Build success: taskingai/taskingai-server:${IMAGE_TAG}"
 
       - name: Run Docker image - WEB
-        working-directory: backend
+        working-directory: fork/backend
         env:
           AES_ENCRYPTION_KEY: ${{ env.AES_ENCRYPTION_KEY }}
           JWT_SECRET_KEY: ${{ env.JWT_SECRET_KEY }}
@@ -90,37 +122,79 @@ jobs:
           -e PURPOSE=WEB \
           -e POSTGRES_URL="postgres://postgres:TaskingAI321@db:5432/taskingai" \
           -e REDIS_URL="redis://cache:6379/0" \
+          -e OBJECT_STORAGE_TYPE="local" \
+          -e HOST_URL=http://127.0.0.1:8080 \
+          -e PATH_TO_VOLUME="./storage" \
+          -e PROJECT_ID="taskingai" \
           -e TASKINGAI_INFERENCE_URL=http://inference:8000 \
           -e TASKINGAI_PLUGIN_URL=http://plugin:8000 \
           -e AES_ENCRYPTION_KEY=$AES_ENCRYPTION_KEY \
           -e JWT_SECRET_KEY=$JWT_SECRET_KEY \
           taskingai/taskingai-server:$IMAGE_TAG
 
-      - name: Run Docker image - API
-        working-directory: backend
+      - name: Run R2 Docker image - API
+        working-directory: fork/backend
         env:
           AES_ENCRYPTION_KEY: ${{ env.AES_ENCRYPTION_KEY }}
+          TEST_S3_SECRET_R2: ${{ secrets.TEST_S3_SECRET_R2 }}
         run: |
-          docker run --network taskingai-network --rm -d -p 8090:8000 \
+          echo "$TEST_S3_SECRET_R2" > r2.env
+          docker run --name r2_docker  --network taskingai-network --rm -d -p 8090:8000 \
+          --env-file r2.env \
           -e PURPOSE=API \
           -e POSTGRES_URL="postgres://postgres:TaskingAI321@db:5432/taskingai" \
           -e REDIS_URL="redis://cache:6379/0" \
+          -e OBJECT_STORAGE_TYPE="s3" \
+          -e PATH_TO_VOLUME="./storage" \
+          -e PROJECT_ID="taskingai" \
           -e TASKINGAI_INFERENCE_URL=http://inference:8000 \
           -e TASKINGAI_PLUGIN_URL=http://plugin:8000 \
           -e AES_ENCRYPTION_KEY=$AES_ENCRYPTION_KEY \
           taskingai/taskingai-server:$IMAGE_TAG
 
       - name: Wait for service to start
-        run: sleep 10
-
-      - name: Install Dependencies
-        working-directory: TaskingAI-Test
-        run: pip install -r requirements.txt
+        env:
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          INFERENCE_PROVIDER_CREDENTIALS: ${{ secrets.INFERENCE_PROVIDER_CREDENTIALS }}
+          PLUGIN_BUNDLE_CREDENTIALS: ${{ secrets.PLUGIN_BUNDLE_CREDENTIALS }}
+        run: |
+          echo "$INFERENCE_PROVIDER_CREDENTIALS" >> .env
+          echo "$PLUGIN_BUNDLE_CREDENTIALS" >> .env
+          sleep 10
 
       - name: Run WEB Tests
-        working-directory: TaskingAI-Test
-        run: bash ./community_app/run_test.sh
+        working-directory: fork/backend
+        run: bash ./run_web_test.sh
 
-      - name: Run API Tests
-        working-directory: TaskingAI-Test
-        run: bash ./community_api/run_test.sh
+      - name: Run R2 API Tests
+        working-directory: fork/backend
+        run: bash ./run_api_test.sh
+
+      - name: Stop Docker container
+        run: |
+          docker stop r2_docker
+          sleep 5
+
+      - name: Run AWS Docker image - API
+        working-directory: fork/backend
+        env:
+          AES_ENCRYPTION_KEY: ${{ env.AES_ENCRYPTION_KEY }}
+          TEST_S3_SECRET_AWS: ${{ secrets.TEST_S3_SECRET_AWS }}
+        run: |
+          echo "$TEST_S3_SECRET_AWS" > aws.env
+          docker run --name aws_docker  --network taskingai-network --rm -d -p 8090:8000 \
+          --env-file aws.env \
+          -e PURPOSE=API \
+          -e POSTGRES_URL="postgres://postgres:TaskingAI321@db:5432/taskingai" \
+          -e REDIS_URL="redis://cache:6379/0" \
+          -e OBJECT_STORAGE_TYPE="s3" \
+          -e PATH_TO_VOLUME="./storage" \
+          -e PROJECT_ID="taskingai" \
+          -e TASKINGAI_INFERENCE_URL=http://inference:8000 \
+          -e TASKINGAI_PLUGIN_URL=http://plugin:8000 \
+          -e AES_ENCRYPTION_KEY=$AES_ENCRYPTION_KEY \
+          taskingai/taskingai-server:$IMAGE_TAG
+
+      - name: Run AWS API Tests
+        working-directory: fork/backend
+        run: bash ./run_api_test.sh

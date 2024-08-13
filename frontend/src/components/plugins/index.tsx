@@ -1,22 +1,19 @@
 import {
-    Space, Spin, Tooltip, Modal, Button, Form, Input, Drawer
+    Space, Spin, Tooltip,  Button, Form, Input, Drawer
 } from 'antd';
-import { RightOutlined } from '@ant-design/icons'
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchPluginData } from '../../Redux/actions';
-
+import CreatePlugin from '../createPlugin/index.tsx';
 import styles from './plugins.module.scss'
-import { useState, useEffect } from 'react';
-import { LeftOutlined } from '@ant-design/icons';
+import { useState, useEffect,useRef } from 'react';
 import ClipboardJS from 'clipboard';
 import { toast } from 'react-toastify';
-import { deletePlugin, bundleList, getPluginDetail, createPlugin, getPluginList, editPlugin } from '@/axios/plugin.ts'
+import { deletePlugin, bundleList, getPluginList, editPlugin } from '@/axios/plugin.ts'
 import closeIcon from '../../assets/img/x-close.svg'
 import DeleteModal from '../deleteModal/index.tsx'
 import ModalTable from '../modalTable/index'
 import CopyOutlined from '@/assets/img/copyIcon.svg?react';
 import ParameterTable from '../parameterTable/index.tsx'
-import RightArrow from '../../assets/img/rightarrow.svg?react'
 import EditIcon from '../../assets/img/editIcon.svg?react'
 import DeleteIcon from '../../assets/img/deleteIcon.svg?react'
 import ToolsNew from '../../assets/img/tools.svg?react'
@@ -27,12 +24,11 @@ import { useTranslation } from "react-i18next";
 
 function Plugins() {
     const { t } = useTranslation();
+    const createPluginRef = useRef<any>()
     const dispatch = useDispatch()
-
     const { pluginLists } = useSelector((state: any) => state.plugin);
-
     const { bundleTableColumn } = CommonComponents()
-    const { tooltipEditTitle, tooltipDeleteTitle } = tooltipTitle();
+    const { tooltipEditTitle, tooltipDeleteTitle,tooltipPluginTitle } = tooltipTitle();
     const [loading, setLoading] = useState(false);
     const [form] = Form.useForm()
     const [pluginFunList, setPluginFunList] = useState([])
@@ -48,23 +44,18 @@ function Plugins() {
     const [bundilesList, setBundlesList] = useState([])
     const [credentialsSchema, setCredentialsSchema] = useState({})
     const [inputSchema, setInputSchema] = useState({})
-    const [openCreateModal2, setOpenCreateModal2] = useState(false)
-    const [openCreateModal3, setOpenCreateModal3] = useState(false)
     const [resetButtonShow, setResetButtonShow] = useState(true)
     const [pluginListData, setPluginListData] = useState([])
-    const [pluginInfoLoading, setPluginInfoLoading] = useState(false)
     const [pluginId, setPluginId] = useState('')
     const [pluginName, setPluginName] = useState('')
     const [pluginDesc, setPluginDesc] = useState('')
     const [bundleDesc, setBundleDesc] = useState('')
-    const [nextloading1, setNextLoading1] = useState(false)
     const [confirmLoading, setConfirmLoading] = useState(false)
     const [openEditDrawer, setOpenEditDrawer] = useState(false)
     const [openEditFormDrawer, setOpenEditFormDrawer] = useState(false)
     const [isShowBundle, setIsShowBundle] = useState(true)
     const [cachedImages, setCachedImages] = useState({});
     useEffect(() => {
-    
         const params1 = {
             limit: 100,
             offset: 0,
@@ -104,35 +95,9 @@ function Plugins() {
     };
     const handleCreatePrompt = async () => {
         setOpenDrawer(true)
-        const selectedItem: any = bundilesList.find((item: any) => item.registered === false) || []
-        setBundleId(selectedItem.bundle_id)
-        setBundleName(selectedItem.name)
-        try {
-            setPluginInfoLoading(true)
-            const res = await getPluginDetail(selectedItem.bundle_id)
-            setPluginListData(res.data)
-            setPluginId(res.data[0].plugin_id)
-            setCredentialsSchema(selectedItem.credentials_schema)
-            setPluginName(res.data[0].name)
-            setPluginDesc(res.data[0].description)
-            const inputSchematemp = res.data[0].input_schema
-            const arr: any[] = []
-            Object.values(inputSchematemp).forEach((item: any) => {
-                arr.push(item)
-            })
-            setInputSchema(arr)
-        } catch (error) {
-            console.log(error)
-        } finally {
-            setPluginInfoLoading(false)
-        }
-
     }
     const getBundleList = async (params: object) => {
         const res: any = await bundleList(params)
-        setBundleId(res.data[0].bundle_id)
-        setBundleName(res.data[0].name)
-        setBundleDesc(res.data[0].description)
         const imagesData: any = {};
         res.data.forEach((image: any) => {
             fetch(image.icon_url)
@@ -147,19 +112,6 @@ function Plugins() {
                 });
         });
         setBundlesList(res.data)
-
-        setCredentialsSchema(res.data[0].credentials_schema)
-        const res1 = await getPluginDetail(res.data[0].bundle_id)
-        setPluginListData(res1.data)
-        setPluginId(res1.data[0].plugin_id)
-        setPluginName(res1.data[0].name)
-        setPluginDesc(res1.data[0].description)
-        const inputSchematemp = res1.data[0].input_schema
-        const arr: any[] = []
-        Object.values(inputSchematemp).forEach((item: any) => {
-            arr.push(item)
-        })
-        setInputSchema(arr)
     }
     const columns = [...bundleTableColumn]
     columns.push({
@@ -170,7 +122,7 @@ function Plugins() {
         render: (_: any, record: any) => (
             <Space size="middle">
                 <div onClick={() => handleTools(record)} className='table-edit-icon'>
-                    <Tooltip placement='bottom' color='#fff' arrow={false} overlayClassName='table-tooltip'>
+                    <Tooltip placement='bottom' color='#fff' arrow={false} title={tooltipPluginTitle} overlayClassName='table-tooltip'>
                         <ToolsNew />
                     </Tooltip>
                 </div>
@@ -192,6 +144,7 @@ function Plugins() {
         setBundleId(record.bundle_id)
         const data: any = (bundilesList.find((item: any) => item.bundle_id === record.bundle_id) as any)
         setBundleName(data.name)
+        setBundleDesc(record.description)
         setCredentialsSchema(data.credentials_schema)
         form.setFieldsValue(record.display_credentials)
         setResetButtonShow(true)
@@ -202,6 +155,9 @@ function Plugins() {
         setLoading(true)
         try {
             setPluginListData(record.plugins)
+            setPluginName(record.plugins[0].name)
+            setPluginDesc(record.plugins[0].description)
+            setBundleName(record.name)
             setPluginId(record.plugins[0].plugin_id)
             const inputSchematemp = record.plugins[0].input_schema
             const arr: any[] = []
@@ -249,47 +205,23 @@ function Plugins() {
     const onDeleteConfirm = async () => {
         try {
             await deletePlugin(bundleId)
-
             const limit1: number = limit || 20
             dispatch(fetchPluginData(limit1) as any);
+            if(createPluginRef.current) {
+                createPluginRef.current.getBundleList({
+                    limit: 100,
+                    offset: 0,
+                    lang: 'en'
+                })
+            }
             setUpdatePrevButton(true)
         } catch (error) {
             console.log(error)
         }
         setOpenDeleteModal(false)
     }
-    const handleCancel = () => {
-        setOpenDrawer(false)
-        setOpenCreateModal2(false)
-    }
-    const handleCancel1 = () => {
-        setOpenCreateModal2(false)
-    }
-    const handleCancel2 = () => {
-        setOpenCreateModal3(false)
-    }
-    const handleNext = () => {
-        setOpenCreateModal2(true)
-        setIsShowBundle(true)
-        setFormDisabled(false)
-
-    }
-    const handleClickBundle = async (bundleId: string, bundelName: string, item: any) => {
-        setBundleId(bundleId)
-        setBundleName(bundelName)
-        setBundleDesc(item.description)
-        setPluginListData(item.plugins)
-        setPluginId(item.plugins[0].plugin_id)
-        setCredentialsSchema(item.credentials_schema)
-        setPluginName(item.plugins[0].name)
-        setPluginDesc(item.plugins[0].description)
-        const inputSchematemp = item.plugins[0].input_schema
-        const arr: any[] = []
-        Object.values(inputSchematemp).forEach((item: any) => {
-            arr.push(item)
-        })
-        setInputSchema(arr)
-    }
+   
+  
     const handleClickPlugin = (pluginId: string, pluginName: string) => {
         setPluginId(pluginId)
         setPluginName(pluginName)
@@ -304,63 +236,14 @@ function Plugins() {
     const handleValuesChange = (changedValues: object) => {
         form.validateFields(Object.keys(changedValues));
     };
-    const handleNext1 = async () => {
-
-        if (JSON.stringify(credentialsSchema) === '{}') {
-            const params = {
-                name: bundleName,
-                bundle_id: bundleId,
-            }
-            try {
-                setNextLoading1(true)
-                await createPlugin(params)
-                const limit1: number = limit || 20
-                dispatch(fetchPluginData(limit1) as any);
-                setOpenCreateModal3(false)
-                setOpenCreateModal2(false)
-                setOpenDrawer(false)
-                setUpdatePrevButton(true)
-                toast.success('Creation successful!')
-            } catch (e) {
-                const apiError = e as ApiErrorResponse;
-                const errorMessage: string = apiError.response.data.error.message;
-                toast.error(errorMessage)
-            } finally {
-                setNextLoading1(false)
-            }
-        } else {
-            setResetButtonShow(false)
-            form.resetFields()
-            setOpenCreateModal3(true)
-        }
+ 
+    const handleConfirmRequest = async () => {
+        dispatch(fetchPluginData(20) as any);
     }
-    const handleConfirm = () => {
-        form.validateFields().then(async () => {
-            try {
-                const credentials = form.getFieldsValue()
-                const params = {
-                    name: bundleName,
-                    credentials,
-                    bundle_id: bundleId,
-                }
-                setConfirmLoading(true)
-                await createPlugin(params)
-                const limit1: number = limit || 20
-                dispatch(fetchPluginData(limit1) as any);
-                setOpenCreateModal3(false)
-                setOpenCreateModal2(false)
-                setOpenDrawer(false)
-                setUpdatePrevButton(true)
-                toast.success('Creation successful!')
-            } catch (error) {
-                const apiError = error as ApiErrorResponse;
-                const errorMessage: string = apiError.response.data.error.message;
-                toast.error(errorMessage)
-            } finally {
-                setConfirmLoading(false)
-            }
-        })
+    const handleClosePluginModal = () => {
+        setOpenDrawer(false)
     }
+ 
     const handleResetCredentials = async () => {
         form.resetFields();
         setResetButtonShow(false)
@@ -407,7 +290,6 @@ function Plugins() {
 
                             </div>
                             <div className={styles.pluginDesc}>{pluginDesc}</div>
-                            {/* <div className={styles.inputParams}>{t('projectInputParameters')}</div> */}
                             <div style={{ marginLeft: '24px' }}>
                                 <ParameterTable parameters={inputSchema} />
                             </div>
@@ -429,7 +311,7 @@ function Plugins() {
                 {JSON.stringify(credentialsSchema) !== '{}' && <div>
                     <div className={styles['credentials']}>{t('projectModelCredentials')}</div>
                     <div className={styles['label-desc']} style={{ marginBottom: '24px' }}>
-                        All plugin credentials are encrypted at rest with AES-256 and in transit with TLS 1.2. Refer to <a className='href' href='https://docs.tasking.ai/docs/guide/tool/plugin/create-bundles-and-plugins' target='_blank' rel='noopener noreferrer'>documentation</a> for more information.
+                        All plugin credentials are encrypted at rest with AES-256 and in transit with TLS 1.2.
                     </div>
                     {resetButtonShow && <div className={styles['formbuttoncancel']} onClick={handleResetCredentials}>
                         <div className={styles['text1']}>{t('projectModelResetCredentials')}</div>
@@ -502,115 +384,11 @@ function Plugins() {
     return (
         <div className={styles["actions"]}>
             <Spin spinning={loading} wrapperClassName={styles.spinloading}>
-                <ModalTable loading={loading} updatePrevButton={updatePrevButton} name='plugins' id='bundle_id' hasMore={hasMore} ifSelect={false} columns={columns} dataSource={pluginFunList} onChildEvent={handleChildEvent} onOpenDrawer={handleCreatePrompt} />
+                <ModalTable loading={loading} title='New plugin' updatePrevButton={updatePrevButton} name='plugin' id='bundle_id' hasMore={hasMore} ifSelect={false} columns={columns} dataSource={pluginFunList} onChildEvent={handleChildEvent} onOpenDrawer={handleCreatePrompt} />
             </Spin>
-            <Modal footer={[
-                <>
-                    {openCreateModal2 ? <>
-                        <Button icon={<LeftOutlined />} key="cancel" onClick={handleCancel1} className='cancel-button'>
-                            {t('back')}
-                        </Button>
-                        <Button key="submit" loading={nextloading1} onClick={handleNext1} className='next-button' style={{ marginLeft: '10px' }}>
-                            {t('confirm')}
-                        </Button>
-                    </> : <><Button key="cancel" onClick={handleCancel} className='cancel-button'>
-                        {t('cancel')}
-                    </Button>
-                        <Button key="submit" onClick={handleNext} className='next-button' style={{ marginLeft: '10px' }}>
-                            {t('next')}
-                            <RightOutlined />
-                        </Button></>}
-                </>
-            ]} width={1280} onCancel={handleCancel} centered closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} title={openCreateModal2 ? t('projectBundleSelection') : t('projectPluginCreate')} open={openCreateModal1} className={styles.drawerCreate}>
-                {openCreateModal2 ? <ComponentsData /> : <Spin spinning={pluginInfoLoading}>
-                    <div className={styles.modalContent}>
-                        <div className={styles.left}>
-                            <div className={styles.selectBundleDesc}>{t('projectBundleDesc')}</div>
-                            <div className={styles.content}>
-                                {bundilesList.map((item: any, index) => (
-                                    <div key={index} className={`${styles.frameParent} ${item.bundle_id === bundleId && styles.activeframeParent} ${item.registered && styles.registeredItem}`} onClick={item.registered ? undefined : () => { handleClickBundle(item.bundle_id, item.name, item) }}>
-                                        <div className={styles.logoParent}>
-                                            <img src={(cachedImages as any)[item.bundle_id]} alt="" className={styles.img} />
-                                            <div className={styles.frameWrapper}>
-                                                <div className={styles.frameWrapper}>
-                                                    <div className={styles.frameDiv}>
-                                                        <div className={styles.frameChild} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {item.registered ? <div className={styles.registered}>Registered</div> : <RightArrow />}
-
-                                        </div>
-                                        <div className={styles.googleWebSearch}>{item.name}</div>
-                                        <div className={styles.label}>{item.description}</div>
-                                        {/* <div className={styles.webSearchWrapper}>
-                                        <div className={styles.webSearch}>Web Search</div>
-                                    </div> */}
-                                        <div className={styles.frameGroup}>
-                                            <div className={styles.functionaliconsParent}>
-                                                <ToolsNew />
-                                                <div className={styles.webSearch}>{item.num_plugins}  {item.num_plugins > 1 ? t('projectToolsTitle') : 'Tool'}</div>
-                                            </div>
-                                            <div className={styles.taskingaiWrapper}>
-                                                <div className={styles.taskingai}>{item.developer}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-
-                            </div>
-                            {/* <Paginations hasMore={bundlesHasMore} onFetchData={getBundleList}></Paginations> */}
-                        </div>
-                        <>
-                            <div className={styles.popupbodynormal}>
-                                <div className={styles.googleWeb}>
-                                    <img loading="lazy" src={(cachedImages as any)[bundleId]} alt="" style={{ width: '36px', height: '36px' }} />
-                                    <div className={styles.googleWebSearch1}>{bundleName}</div>
-                                </div>
-                                {
-                                    pluginListData.map((item: any, index) => (
-                                        <div className={styles.pluginContent} key={index}>
-                                            <div className={styles.pluginTitle}>{item.name}</div>
-                                            <div className={styles.pluginDesc}>
-                                                {item.description}
-                                            </div>
-                                        </div>
-                                    ))
-                                }
-                            </div>
-                        </>
-                    </div>
-                </Spin>
-                }
-            </Modal>
-            {/* <Modal footer={[
-                <Button icon={<LeftOutlined />} key="cancel" onClick={handleCancel1} className='cancel-button'>
-                    {t('back')}
-                </Button>,
-                <Button key="submit" onClick={handleNext1} className='next-button'>
-                    {t('confirm')}
-                </Button>
-            ]} width={1280} onCancel={handleCancel1} className={styles.createModal2} open={openCreateModal2} centered title={t('projectPluginCreate')} closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} >
-                <ComponentsData />
-            </Modal> */}
-            <Modal footer={[
-                <Button key="cancel" onClick={handleCancel2} className='cancel-button'>
-                    {t('cancel')}
-                </Button>,
-                <Button key="submit" loading={confirmLoading} onClick={handleConfirm} className='next-button'>
-                    {t('confirm')}
-                </Button>
-            ]} width={720} onCancel={handleCancel2} open={openCreateModal3} centered closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} title={t('projectPluginCreate')} className={styles.createModal3}>
-                <EditForm />
-            </Modal>
-            <Drawer footer={[
-                <Button key="cancel" onClick={handleEditCancel} className='cancel-button'>
-                    {t('cancel')}
-                </Button>,
-                <Button key="submit" loading={confirmLoading} onClick={handleEditCancel} className={`next-button ${styles.button}`}>
-                    {t('confirm')}
-                </Button>
-            ]} width={1280} closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} onClose={handleEditCancel} open={openEditDrawer} title={`${t('projectBundleTitle')} ${t('projectModelColumnName')}/${t('projectPluginsTitle')}`} className={styles.openEditDrawer}>
+            <CreatePlugin ref={createPluginRef} handleConfirmRequest={handleConfirmRequest} open={openCreateModal1} handleCloseModal={handleClosePluginModal}></CreatePlugin>
+   
+            <Drawer footer={null} width={1280} closeIcon={<img src={closeIcon} alt="closeIcon" className={styles['img-icon-close']} />} onClose={handleEditCancel} open={openEditDrawer} title={bundleName + ' / ' + t('projectPluginsTitle')} className={styles.openLookDrawer}>
                 <ComponentsData />
             </Drawer>
             <Drawer title={t('projectPluginEditPlugin')} footer={[

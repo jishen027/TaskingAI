@@ -1,0 +1,36 @@
+model_schema_id: google_gemini/gemini-pro-vision
+provider_model_id: gemini-1.5-pro
+type: chat_completion
+name: "i18n:gemini_pro_vision_name"
+description: "i18n:gemini_pro_vision_description"
+deprecated: true
+
+properties:
+  vision: true
+  function_call: true
+  streaming: true
+  input_token_limit: 12288
+  output_token_limit: 4096
+
+config_schemas:
+  - config_id: temperature
+    type: float
+    default: 0.7
+    min: 0.0
+    max: 2.0
+    step: 0.1
+  - config_id: top_p
+  - config_id: top_k
+  - config_id: max_tokens
+    type: int
+    default: 4096
+    min: 1
+    max: 4096
+    step: 1
+  - config_id: stop
+
+pricing:
+  input_token: 0
+  output_token: 0
+  unit: 0
+  currency: USD

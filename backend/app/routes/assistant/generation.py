@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Request
-from starlette.responses import StreamingResponse
 from typing import Dict
+from starlette.responses import StreamingResponse
 
 from tkhelper.schemas.base import BaseDataResponse
 
-from app.services.assistant import get_assistant_and_chat, NormalSession, StreamSession
+from app.services.assistant import get_assistant_and_chat, StatefulNormalSession, StatefulStreamSession
 from app.schemas.assistant.generate import MessageGenerateRequest
 
 from ..utils import auth_info_required
@@ -37,11 +37,12 @@ async def api_chat_generate(
     assistant, chat = await get_assistant_and_chat(assistant_id, chat_id)
 
     if payload.stream or payload.debug:
-        session = StreamSession(
+        session = StatefulStreamSession(
             assistant=assistant,
             chat=chat,
             stream=payload.stream,
             debug=payload.debug,
+            save_logs=False,  # todo: save_logs
         )
         return StreamingResponse(
             session.stream_generate(system_prompt_variables),
@@ -49,8 +50,9 @@ async def api_chat_generate(
         )
 
     else:
-        session = NormalSession(
+        session = StatefulNormalSession(
             assistant=assistant,
             chat=chat,
+            save_logs=False,  # todo: save_logs
         )
         return await session.generate(system_prompt_variables)

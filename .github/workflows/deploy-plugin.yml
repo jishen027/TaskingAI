@@ -1,0 +1,220 @@
+name: Plugin - Build, Test and Deploy
+
+on:
+  push:
+    branches: ["master"]
+    paths:
+      - "plugin/**"
+      - "!**.md"
+      - "!**.svg"
+      - "!**.jpg"
+      - "!**.png"
+  pull_request:
+    branches: ["master"]
+    paths:
+      - ".github/workflows/deploy-plugin.yml"
+env:
+  WORK_DIR: plugin
+  ECR_REPOSITORY: plugin
+  EKS_NAMESPACE_OPEN: taskingai-open
+  EKS_NAMESPACE: ${{ secrets.EKS_NAMESPACE_TEST }}
+  AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION_TEST }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORK_DIR }}
+    environment: test
+    if: github.repository == 'TaskingAI/TaskingAI'
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Check spelling of repo
+        uses: crate-ci/typos@master
+
+      - name: Set short SHA
+        run: echo "IMAGE_TAG=$(echo ${{ github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
+
+      - name: Check for git tag version
+        id: get_tag
+        run: |
+          TAG=$(git describe --tags --exact-match 2> /dev/null || echo "")
+          if [[ -n "$TAG" ]]; then
+            echo "IMAGE_TAG=${TAG}" >> $GITHUB_ENV
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+
+      - name: Install Dependencies
+        working-directory: plugin
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ secrets.AWS_REGION_TEST }}
+          mask-aws-account-id: "true"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION_TEST }}
+          AWS_REGION: ${{ secrets.AWS_REGION_TEST }}
+
+      - name: Get ECR registry
+        run: |
+          ECR_REGISTRY=$(aws ecr describe-repositories --region $AWS_REGION --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
+          echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION_TEST }}
+          AWS_REGION: ${{ secrets.AWS_REGION_TEST }}
+
+      - name: Build Docker image
+        working-directory: plugin
+        env:
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          echo "Build success: ${ECR_REGISTRY}/$ECR_REPOSITORY:${IMAGE_TAG}"
+
+      - name: Run Local Docker image
+        working-directory: plugin
+        env:
+          PLUGIN_BUNDLE_CREDENTIALS: ${{ secrets.PLUGIN_BUNDLE_CREDENTIALS }}
+          AES_ENCRYPTION_KEY: ${{ env.AES_ENCRYPTION_KEY }}
+          TEST_S3_SECRET_R2: ${{ secrets.TEST_S3_SECRET_R2 }}
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+        run: |
+          echo "$PLUGIN_BUNDLE_CREDENTIALS" > .env
+          echo "$TEST_S3_SECRET_R2" >> .env
+          docker run -d --name test_container --network=host \
+          --env-file .env \
+          -e PATH_TO_VOLUME=./test \
+          -e HOST_URL=http://localhost:8030 \
+          -e OBJECT_STORAGE_TYPE=local \
+          -e AES_ENCRYPTION_KEY=$AES_ENCRYPTION_KEY \
+          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          sleep 10 # Wait for service to start
+
+      - name: Run Tests
+        working-directory: plugin
+        run: |
+          bash ./test/run_full_test.sh
+
+      - name: Run Local Tests
+        working-directory: plugin
+        run: |
+          export PATH_TO_VOLUME=./test
+          export HOST_URL=http://localhost:8030
+          bash ./test/run_local_test.sh
+
+      - name: Stop Docker container
+        run: |
+          docker stop test_container
+          sleep 5
+
+      - name: Run S3 without public domain Docker image
+        working-directory: plugin
+        env:
+          PLUGIN_BUNDLE_CREDENTIALS: ${{ secrets.PLUGIN_BUNDLE_CREDENTIALS }}
+          AES_ENCRYPTION_KEY: ${{ env.AES_ENCRYPTION_KEY }}
+          TEST_S3_SECRET_AWS: ${{ secrets.TEST_S3_SECRET_AWS }}
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+        run: |
+          echo "$PLUGIN_BUNDLE_CREDENTIALS" > 1.env
+          echo "$TEST_S3_SECRET_AWS" >> 1.env
+          docker run -d --name aws_s3_docker --network=host \
+          --env-file 1.env \
+          -e PATH_TO_VOLUME="./test"  \
+          -e OBJECT_STORAGE_TYPE="s3" \
+          -e PROJECT_ID="taskingai"  \
+          -e AES_ENCRYPTION_KEY=$AES_ENCRYPTION_KEY \
+          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          sleep 5 # Wait for service to start
+
+      - name: Run S3 without public domain Tests
+        working-directory: plugin
+        run: |
+          echo "$TEST_S3_SECRET_AWS" > .env
+          bash ./test/run_s3_without_test.sh
+
+      - name: Stop Docker container
+        run: |
+          docker stop aws_s3_docker
+          sleep 5
+
+      - name: Run S3 with public domain Docker image
+        working-directory: plugin
+        env:
+          PLUGIN_BUNDLE_CREDENTIALS: ${{ secrets.PLUGIN_BUNDLE_CREDENTIALS }}
+          AES_ENCRYPTION_KEY: ${{ env.AES_ENCRYPTION_KEY }}
+          TEST_S3_SECRET_R2: ${{ secrets.TEST_S3_SECRET_R2 }}
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+        run: |
+          echo "$PLUGIN_BUNDLE_CREDENTIALS" > 2.env
+          echo "$TEST_S3_SECRET_R2" >> 2.env
+          docker run -d --name r2_docker --network=host \
+          --env-file 2.env \
+          -e PATH_TO_VOLUME="./test"  \
+          -e OBJECT_STORAGE_TYPE="s3" \
+          -e PROJECT_ID="taskingai"  \
+          -e AES_ENCRYPTION_KEY=$AES_ENCRYPTION_KEY \
+          $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          sleep 5 # Wait for service to start
+
+      - name: Run S3 with public domain Tests
+        working-directory: plugin
+        run: |
+          echo "$TEST_S3_SECRET_R2" > .env
+          bash ./test/run_s3_with_test.sh
+
+      - name: Stop Docker container
+        run: |
+          docker stop r2_docker
+          sleep 5
+
+      - name: Push Docker image to Amazon ECR
+        if: success()
+        env:
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Update deployment image
+        uses: ianbelcher/eks-kubectl-action@master
+        with:
+          cluster_name: ${{ secrets.CLUSTER_NAME_TEST }}
+          args: -n ${{ env.EKS_NAMESPACE }} set image deployment/${{ env.ECR_REPOSITORY }} ${{ env.ECR_REPOSITORY }}=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+      - name: Verify deployment
+        uses: ianbelcher/eks-kubectl-action@master
+        with:
+          cluster_name: ${{ secrets.CLUSTER_NAME_TEST }}
+          args: -n ${{ env.EKS_NAMESPACE }} rollout status deployment/${{ env.ECR_REPOSITORY }} --timeout=60s
+
+      - name: Update deployment image (open source)
+        uses: ianbelcher/eks-kubectl-action@master
+        with:
+          cluster_name: ${{ secrets.CLUSTER_NAME_TEST }}
+          args: -n ${{ env.EKS_NAMESPACE_OPEN }} set image deployment/${{ env.ECR_REPOSITORY }} ${{ env.ECR_REPOSITORY }}=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+      - name: Verify deployment (open source)
+        uses: ianbelcher/eks-kubectl-action@master
+        with:
+          cluster_name: ${{ secrets.CLUSTER_NAME_TEST }}
+          args: -n ${{ env.EKS_NAMESPACE_OPEN }} rollout status deployment/${{ env.ECR_REPOSITORY }} --timeout=60s

@@ -8,12 +8,14 @@ interface assistantListType {
     retrievals: any[],
     tools: any[],
     name: string,
+    retrieval_configs: {method: string,top_k:number,max_tokens:number},
     description: string,
     max_messages: number,
     max_tokens: number,
     memory: string,
     system_prompt_template: string[],
     model_id: string,
+    model_name: string,
 }
 interface authenticationType {
     type: string

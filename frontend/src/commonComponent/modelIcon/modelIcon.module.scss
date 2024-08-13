@@ -1,0 +1,33 @@
+.model-icon {
+    display: flex;
+    flex-wrap: wrap;
+    .modelIcon {
+        display: flex;
+        margin-right: 8px;
+        border-radius: 8px;
+        background-color: #fafafa;
+        padding: 4px;
+        align-items: center;
+        margin-bottom: 4px;
+        line-height: 12px;
+        svg path{
+            stroke: var(--color-text-secondary);
+        }
+        .name {
+            color: var(--color-text-secondary);
+            font-size: 10px;
+            margin-left: 4px;
+        }
+
+        .value {
+            color: var(--color-text-secondary);
+            font-size: 10px;
+        
+        }
+    }
+    .modelIconText {
+        margin-bottom: 0;
+        margin-right: 0px;
+
+    }
+}
